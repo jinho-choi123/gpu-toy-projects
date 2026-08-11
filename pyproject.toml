@@ -1,0 +1,46 @@
+[project]
+name = "gpu_toys"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "jinho-choi123", email = "choijinho817@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "flash_attention_triton",
+    "loguru==0.7.3",
+    "nvidia-nvshmem-cu12==3.4.5",
+    "nvshmem4py-cu12==0.3.1",
+    "torch==2.11.0"
+]
+
+[dependency-groups]
+dev = [
+    "cmake==3.26.0",
+    "ninja==1.13.0",
+    "pybind11==3.0.4",
+    "pre-commit==4.6.0",
+    "pytest==9.0.3",
+    "ruff==0.15.14",
+    "ty==0.0.38",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.uv.workspace]
+members = [
+    "flash_attention_triton",
+]
+
+[tool.uv.sources]
+"flash_attention_triton" = {workspace=true}
+torch = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
