@@ -1,0 +1,66 @@
+{
+    "name": "gpu-toy-projects-cuda128",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "workspaceFolder": "/workspace",
+    "containerUser": "vscode",
+    "remoteUser": "vscode",
+    "updateRemoteUserUID": true,
+    "runArgs": [
+        "--name=${localEnv:USER}-gpu-toy-projects-cuda128",
+        "--gpus=all",
+        "--cap-add=SYS_ADMIN",
+        "--shm-size=10g",
+        "--ipc=host",
+        "--network=host"
+    ],
+    "containerEnv": {
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "UV_CACHE_DIR": "/workspace/.cache/uv",
+        "UV_LINK_MODE": "copy",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUNBUFFERED": "1",
+        "HF_HOME": "/workspace/.cache/huggingface"
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.cache/huggingface,target=/workspace/.cache/huggingface,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.cache/uv,target=/workspace/.cache/uv,type=bind,consistency=cached"
+    ],
+    "postCreateCommand": {
+        "setup": "bash .devcontainer/post_create.sh"
+    },
+    "postStartCommand": "sudo ssh-keygen -A && (pgrep -x sshd >/dev/null || sudo /usr/sbin/sshd)",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "editor.formatOnSave": true,
+
+                "[c]": {
+                    "editor.defaultFormatter": "xaver.clang-format"
+                },
+                "[cpp]": {
+                    "editor.defaultFormatter": "xaver.clang-format"
+                },
+                "[cuda-cpp]": {
+                    "editor.defaultFormatter": "xaver.clang-format"
+                },
+                "files.associations": {
+                    "*.cu": "cuda-cpp",
+                    "*.cuh": "cuda-cpp"
+                }
+            },
+            "extensions": [
+                "ms-python.python",
+                "charliermarsh.ruff",
+                "astral-sh.ty",
+                "tamasfe.even-better-toml",
+                "ms-vscode.cpptools",
+                "xaver.clang-format",
+                "mechatroner.rainbow-csv"
+            ]
+        }
+    }
+}
