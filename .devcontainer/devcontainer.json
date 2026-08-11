@@ -1,5 +1,5 @@
 {
-    "name": "gpu-toy-projects-cuda128",
+    "name": "gpu-toy-projects-cuda129",
     "build": {
         "dockerfile": "Dockerfile",
         "context": ".."
@@ -10,7 +10,7 @@
     "remoteUser": "vscode",
     "updateRemoteUserUID": true,
     "runArgs": [
-        "--name=${localEnv:USER}-gpu-toy-projects-cuda128",
+        "--name=${localEnv:USER}-gpu-toy-projects-cuda129",
         "--gpus=all",
         "--cap-add=SYS_ADMIN",
         "--shm-size=10g",
