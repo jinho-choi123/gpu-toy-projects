@@ -12,7 +12,7 @@
 
 - The base image must be exactly `nvcr.io/nvidia/cuda:12.9.1-devel-ubuntu24.04`.
 - The devcontainer must install `python3-dev` so Triton can build its CPython driver extension.
-- The workspace must support CPython 3.12 through 3.14 (`>=3.12,<3.15`) on Linux only; Windows and macOS are unsupported.
+- The workspace must support CPython 3.12 through 3.13 (`>=3.12,<3.14`) on Linux only; Windows and macOS are unsupported.
 - PyTorch must remain `2.11.0` and use the official `https://download.pytorch.org/whl/cu129` index on Linux only.
 - CuTe DSL must be pinned to `nvidia-cutlass-dsl==4.6.1`.
 - Triton must remain owned by the PyTorch dependency graph.
@@ -52,7 +52,7 @@ Set the Docker `FROM` line to the required CUDA 12.9.1 image, install `python3-d
 
 Run the Step 1 commands again.
 
-Expected: all commands exit 0 on the supported Linux and CPython 3.12–3.14 contract.
+Expected: all commands exit 0 on the supported Linux and CPython 3.12–3.13 contract.
 
 - [ ] **Step 4: Commit**
 
@@ -76,7 +76,7 @@ git commit -m "build: move GPU stack to CUDA 12.9"
 uv lock --check
 ```
 
-Expected: FAIL because `pyproject.toml` now declares `>=3.12,<3.15` and Linux-only environment/source metadata, while `uv.lock` retains the former `>=3.12` Python contract and platform split.
+Expected: FAIL because `pyproject.toml` now declares `>=3.12,<3.14` and Linux-only environment/source metadata, while `uv.lock` retains the former `>=3.12` Python contract and platform split.
 
 - [ ] **Step 2: Regenerate the lockfile**
 
@@ -109,6 +109,7 @@ git commit -m "build: lock CUDA 12.9 dependencies"
 
 **Files:**
 - Modify: `docs/research/2026-08-11-gpu-kernel-harness.md`
+- Add: `scripts/verify_gpu_stack.py`
 - Verify: `.devcontainer/Dockerfile`, `.devcontainer/devcontainer.json`, `pyproject.toml`, `uv.lock`
 
 **Interfaces:**
@@ -132,10 +133,10 @@ Expected: no stale CUDA identifiers and no claim that Windows wheels resolve; Wi
 
 ```bash
 uv sync --locked
-uv run --locked python -c 'import cutlass, cutlass.cute, torch, triton; print(cutlass.__version__, cutlass.CUDA_VERSION, torch.__version__, torch.version.cuda, triton.__version__, torch.cuda.is_available(), torch.cuda.get_device_capability())'
+uv run --locked python scripts/verify_gpu_stack.py
 ```
 
-Expected: on supported Linux and CPython 3.12–3.14, CuTe DSL 4.6.1 imports; Torch reports `2.11.0+cu129` and CUDA `12.9`; Triton imports; CUDA is available with H100 capability `(9, 0)`.
+Expected: on supported Linux and CPython 3.12–3.13, the script reports CuTe DSL 4.6.1, Torch 2.11.0+cu129/CUDA 12.9, and Triton 3.6.0 on an H100 with capability `(9, 0)`; both JIT kernels execute and report 42.
 
 - [ ] **Step 4: Run repository verification**
 
