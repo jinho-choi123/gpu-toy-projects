@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "jinho-choi123", email = "choijinho817@gmail.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "flash_attention_triton",
     "loguru==0.7.3",
@@ -29,6 +29,7 @@ dev = [
 
 [tool.uv]
 default-groups = ["dev"]
+environments = ["sys_platform == 'linux'"]
 
 [tool.uv.workspace]
 members = [
@@ -38,7 +39,7 @@ members = [
 [tool.uv.sources]
 "flash_attention_triton" = {workspace=true}
 torch = [
-    { index = "pytorch-cu129", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { index = "pytorch-cu129", marker = "sys_platform == 'linux'" },
 ]
 
 [[tool.uv.index]]

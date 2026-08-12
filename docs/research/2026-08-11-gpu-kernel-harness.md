@@ -1,7 +1,7 @@
 # GPU kernel repository harness 조사
 
 - 조사일: 2026-08-11
-- 대상: Python 3.12, PyTorch, Triton, NVIDIA CuTe DSL 기반 GPU kernel 모노레포
+- 대상: Linux의 CPython 3.12–3.14, PyTorch, Triton, NVIDIA CuTe DSL 기반 GPU kernel 모노레포
 - 결정 반영: 공통 CUDA 12.9.1, PyTorch cu129, CuTe DSL 4.6.1
 - 방법: 레포의 현재 파일을 먼저 확인한 뒤, 프로젝트 소유자가 제공하는 공식 문서·공식 소스·명세만 사용했다.
 - 범위: 이 문서는 후보와 적용 순서를 제안할 뿐, 설정 파일이나 구현을 변경하지 않는다.
@@ -9,7 +9,7 @@
 ## 결론
 
 1. **P0 CuTe DSL 호환성 결정은 공통 CUDA 12.9.1 environment로 확정됐다.** 공식 quick start는 CUDA Toolkit 12.9 또는 13.1을 명시하고 CUDA 12.9에는 driver 575.51.03 이상을 요구한다. 현재 H100 host driver 580.178.04는 이 조건을 충족한다. [CuTe DSL Quick Start](https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/quick_start.html)
-2. 사용자는 `nvcr.io/nvidia/cuda:12.9.1-devel-ubuntu24.04`, `torch==2.11.0+cu129`, `nvidia-cutlass-dsl==4.6.1`의 공통 environment를 채택했다. Triton과 CuTe는 같은 toolkit을 사용하되 compile/runtime smoke와 test selection은 독립적으로 유지한다. CuTe DSL은 공개 beta이므로 버전 고정이 특히 중요하다. [CuTe DSL overview](https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/overview.html)
+2. 사용자는 Linux의 CPython 3.12–3.14에서 `nvcr.io/nvidia/cuda:12.9.1-devel-ubuntu24.04`, `torch==2.11.0+cu129`, `nvidia-cutlass-dsl==4.6.1`의 공통 environment를 채택했다. Triton과 CuTe는 같은 toolkit을 사용하되 compile/runtime smoke와 test selection은 독립적으로 유지한다. Windows와 macOS는 이 contract에서 지원하지 않는다. CuTe DSL은 공개 beta이므로 버전 고정이 특히 중요하다. [CuTe DSL overview](https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/overview.html)
 3. commit 때는 수 초 안에 끝나는 file hygiene와 Ruff만 실행하고, type check·CPU test는 pre-push/CI, GPU correctness·sanitizer·benchmark는 GPU CI로 분리한다. `pre-commit`은 `pre-commit`, `pre-push`, `commit-msg`, `manual` stage를 구분할 수 있다. [pre-commit stages](https://pre-commit.com/#confining-hooks-to-run-at-certain-stages)
 4. 테스트는 `CPU/reference → Triton interpreter → GPU compile smoke → GPU runtime smoke → numerical correctness → sanitizer → benchmark`의 층으로 나눈다. Triton interpreter는 CPU에서 실행되지만 실제 GPU compilation을 우회하고 기능 제한도 있으므로 GPU compile/runtime test를 대신할 수 없다. [Triton debugging/interpreter](https://triton-lang.org/main/programming-guide/chapter-3/debugging.html)
 5. 성능 gate는 바로 켜지 않는다. 먼저 고정된 GPU/driver/toolchain에서 warm-up, 반복 측정, quantile, 환경 metadata를 수집해 자연 변동폭을 정한다. CUDA kernel launch는 비동기이므로 일반 CPU timer만 쓰면 잘못 측정하기 쉽다. Triton의 GPU-aware benchmark API 또는 CUDA event를 사용해야 한다. [Triton `do_bench`](https://triton-lang.org/main/python-api/generated/triton.testing.do_bench.html), [CUDA timing guidance](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#timing)
@@ -19,7 +19,7 @@
 | 항목 | 확인된 상태 | 의미 |
 |---|---|---|
 | Packaging | root `pyproject.toml`이 `uv` workspace이고 `flash_attention_triton`이 member이며 `uv.lock`이 있음 | workspace 전체가 한 lockfile을 공유하는 방향은 적절함 |
-| Python/GPU stack | Python 3.12, Torch 2.11.0+cu129, Triton 3.6.0 lock | 공통 CUDA 12.9 기준 조합으로 기록 |
+| Python/GPU stack | Linux의 CPython 3.12–3.14, Torch 2.11.0+cu129, Triton 3.6.0 lock | 공통 CUDA 12.9 기준 조합으로 기록 |
 | CuTe DSL | `nvidia-cutlass-dsl==4.6.1` dependency/lock 추가 | 공통 CUDA 12.9 environment에서 import와 compile smoke 검증 필요 |
 | Dev tools | `pre-commit`, `pytest`, `ruff`, `ty`가 dev dependency에 있음 | 도구 설치는 시작됐지만 정책과 실행 진입점이 필요함 |
 | Container | `nvcr.io/nvidia/cuda:12.9.1-devel-ubuntu24.04` tag로 변경 | devcontainer rebuild 뒤 toolkit 12.9.1이 적용됨; digest는 아직 고정되지 않음 |

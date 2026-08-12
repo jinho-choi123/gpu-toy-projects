@@ -12,7 +12,8 @@
 
 - The base image must be exactly `nvcr.io/nvidia/cuda:12.9.1-devel-ubuntu24.04`.
 - The devcontainer must install `python3-dev` so Triton can build its CPython driver extension.
-- PyTorch must remain `2.11.0` and use the official `https://download.pytorch.org/whl/cu129` index on Linux and Windows.
+- The workspace must support CPython 3.12 through 3.14 (`>=3.12,<3.15`) on Linux only; Windows and macOS are unsupported.
+- PyTorch must remain `2.11.0` and use the official `https://download.pytorch.org/whl/cu129` index on Linux only.
 - CuTe DSL must be pinned to `nvidia-cutlass-dsl==4.6.1`.
 - Triton must remain owned by the PyTorch dependency graph.
 - The existing uncommitted research document must be preserved and updated, not discarded.
@@ -28,7 +29,7 @@
 
 **Interfaces:**
 - Consumes: The current CUDA 12.8 devcontainer and `pytorch-cu128` explicit uv index.
-- Produces: A CUDA 12.9.1 devcontainer, `pytorch-cu129` index, and pinned CuTe DSL dependency.
+- Produces: A Linux-only CUDA 12.9.1 devcontainer, `pytorch-cu129` index, and pinned CuTe DSL dependency.
   The image also provides Python development headers required by Triton runtime compilation.
 
 - [ ] **Step 1: Run a failing declaration check**
@@ -51,7 +52,7 @@ Set the Docker `FROM` line to the required CUDA 12.9.1 image, install `python3-d
 
 Run the Step 1 commands again.
 
-Expected: all commands exit 0.
+Expected: all commands exit 0 on the supported Linux and CPython 3.12–3.14 contract.
 
 - [ ] **Step 4: Commit**
 
@@ -75,7 +76,7 @@ git commit -m "build: move GPU stack to CUDA 12.9"
 uv lock --check
 ```
 
-Expected: FAIL because `pyproject.toml` changed but `uv.lock` still describes cu128 and lacks CuTe DSL.
+Expected: FAIL because `pyproject.toml` now declares `>=3.12,<3.15` and Linux-only environment/source metadata, while `uv.lock` retains the former `>=3.12` Python contract and platform split.
 
 - [ ] **Step 2: Regenerate the lockfile**
 
@@ -83,7 +84,7 @@ Expected: FAIL because `pyproject.toml` changed but `uv.lock` still describes cu
 uv lock
 ```
 
-Expected: resolution succeeds using the explicit cu129 index.
+Expected: resolution succeeds for the Linux-only explicit cu129 index.
 
 - [ ] **Step 3: Verify locked package identities**
 
@@ -118,13 +119,14 @@ git commit -m "build: lock CUDA 12.9 dependencies"
 
 Replace the historical split-lane recommendation with the accepted common CUDA 12.9.1 environment. Preserve the original compatibility rationale and state that separate Triton/CuTe test selections remain useful even though they share one toolkit.
 
-- [ ] **Step 2: Scan for stale configuration identifiers**
+- [ ] **Step 2: Scan for stale configuration identifiers and unsupported platform claims**
 
 ```bash
 git ls-files .devcontainer pyproject.toml uv.lock | xargs rg -n 'cuda128|cu128|pytorch-cu128|12\.8\.1-devel'
+rg -n 'Linux and Windows|win32|Windows wheels' pyproject.toml docs/research docs/superpowers/specs
 ```
 
-Expected: no matches.
+Expected: no stale CUDA identifiers and no claim that Windows wheels resolve; Windows may appear only as unsupported.
 
 - [ ] **Step 3: Sync and verify Python packages**
 
@@ -133,7 +135,7 @@ uv sync --locked
 uv run --locked python -c 'import cutlass, cutlass.cute, torch, triton; print(cutlass.__version__, cutlass.CUDA_VERSION, torch.__version__, torch.version.cuda, triton.__version__, torch.cuda.is_available(), torch.cuda.get_device_capability())'
 ```
 
-Expected: CuTe DSL 4.6.1 imports; Torch reports `2.11.0+cu129` and CUDA `12.9`; Triton imports; CUDA is available with H100 capability `(9, 0)`.
+Expected: on supported Linux and CPython 3.12–3.14, CuTe DSL 4.6.1 imports; Torch reports `2.11.0+cu129` and CUDA `12.9`; Triton imports; CUDA is available with H100 capability `(9, 0)`.
 
 - [ ] **Step 4: Run repository verification**
 
