@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/cuda:12.8.1-devel-ubuntu24.04
+FROM nvcr.io/nvidia/cuda:12.9.1-devel-ubuntu24.04
 
 ARG USERNAME=vscode
 ARG USER_UID=1000
@@ -26,6 +26,7 @@ RUN apt-get update \
         perl \
         procps \
         python3 \
+        python3-dev \
         python3-pip \
         ripgrep \
         sudo \
