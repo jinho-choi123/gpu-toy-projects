@@ -49,7 +49,7 @@ Algorithmic work assigned to an attention case divided by its steady-state laten
 _Avoid_: Hardware utilization, actual hardware FLOP rate
 
 **Profile case**:
-A representative supported case selected for detailed hardware-counter capture rather than inclusion in the full benchmark sweep.
+A representative supported case selected for detailed hardware-counter capture instead of profiling every benchmark case. It may also belong to the benchmark sweep.
 _Avoid_: Benchmark case
 
 **Raw profile**:
