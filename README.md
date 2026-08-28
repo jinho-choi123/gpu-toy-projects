@@ -10,7 +10,7 @@ GPU kernel experiments built with PyTorch, Triton, and NVIDIA CuTe DSL.
 | OS              | Linux (Ubuntu 24.04)                       |
 | NVIDIA driver   | 575.51.03 or newer                         |
 | CUDA toolkit    | 12.9.1                                     |
-| Python          | 3.12 or 3.13 (managed by `uv`)             |
+| Python          | 3.13 (managed by `uv`)                     |
 | Package manager | `uv`                                       |
 
 RAM and VRAM minimums are not defined. The current verification script requires an H100.

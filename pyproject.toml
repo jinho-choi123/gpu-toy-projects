@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "jinho-choi123", email = "choijinho817@gmail.com" }
 ]
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "flash_attention_1_triton",
     "loguru==0.7.3",
@@ -71,7 +71,10 @@ line-ending = "lf"
 python = ".venv"
 python-version = "3.13"
 root = ["."]
+extra-paths = [
+    ".venv/lib/python3.13/site-packages/nvidia_cutlass_dsl/dsl_packages",
+]
 
 [tool.ty.src]
-include = ["flash_attention_1_triton"]
+include = ["flash_attention_1_triton", "scripts"]
 exclude = ["docs/"]

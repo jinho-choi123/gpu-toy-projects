@@ -1,11 +1,11 @@
 """Compile and execute minimal Triton and CuTe kernels on an H100."""
 
-import cutlass  # ty: ignore[unresolved-import]
+import cutlass
 import torch
 import triton
 import triton.language as tl
-from cutlass import cute  # ty: ignore[unresolved-import]
-from cutlass.cute.runtime import from_dlpack  # ty: ignore[unresolved-import]
+from cutlass import cute
+from cutlass.cute.runtime import from_dlpack
 from loguru import logger
 
 EXPECTED_RESULT = 42.0
