@@ -1,16 +1,13 @@
 [project]
-name = "flash_attention_triton"
+name = "flash_attention_1_triton"
 version = "0.1.0"
-description = "Add your description here"
+description = "A Triton implementation of FlashAttention 1"
 readme = "README.md"
 authors = [
     { name = "jinho-choi123", email = "choijinho817@gmail.com" }
 ]
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.13,<3.14"
 dependencies = []
-
-[project.scripts]
-flash-attention-triton = "flash_attention_triton:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]

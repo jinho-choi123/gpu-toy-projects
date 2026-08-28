@@ -1,29 +1,26 @@
 """Compile and execute minimal Triton and CuTe kernels on an H100."""
 
-import cutlass  # ty: ignore[unresolved-import]
-from cutlass import cute  # ty: ignore[unresolved-import]
-from cutlass.cute.runtime import from_dlpack  # ty: ignore[unresolved-import]
-from loguru import logger
+import cutlass
 import torch
 import triton
 import triton.language as tl
-
+from cutlass import cute
+from cutlass.cute.runtime import from_dlpack
+from loguru import logger
 
 EXPECTED_RESULT = 42.0
 
 
 def _validate_result(stack: str, actual: float) -> None:
     if actual != EXPECTED_RESULT:
-        message = (
-            f"{stack} smoke failed: expected={EXPECTED_RESULT:g}, actual={actual:g}"
-        )
-        logger.error(message)
+        message = f"{stack} smoke failed: expected={EXPECTED_RESULT:g}, actual={actual:g}"
         raise RuntimeError(message)
     logger.info("{} smoke passed: result={:g}", stack, actual)
 
 
 @triton.jit
 def add_one_kernel(input_pointer, output_pointer):
+    """Add one to a single input element."""
     offset = tl.program_id(0)
     value = tl.load(input_pointer + offset)
     tl.store(output_pointer + offset, value + 1.0)
@@ -31,15 +28,18 @@ def add_one_kernel(input_pointer, output_pointer):
 
 @cute.kernel
 def smoke_kernel(output: cute.Tensor, value: cutlass.Float32):
+    """Add one to a scalar value on the GPU."""
     output[0] = value + cutlass.Float32(1.0)
 
 
 @cute.jit
 def launch_smoke(output: cute.Tensor, value: cutlass.Float32):
+    """Launch the CuTe smoke kernel."""
     smoke_kernel(output, value).launch(grid=(1, 1, 1), block=(1, 1, 1))
 
 
 def main() -> None:
+    """Verify the configured GPU stack."""
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is not available")
 
