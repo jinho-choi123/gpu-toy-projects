@@ -7,7 +7,7 @@ from torch import Tensor
 
 
 @jaxtyped(typechecker=beartype)
-def flash_attention_varlen(
+def flash_attention_varlen_func(
     q: (
         Float16[Tensor, "total_queries heads head_dim"]
         | BFloat16[Tensor, "total_queries heads head_dim"]
@@ -56,4 +56,4 @@ def flash_attention_varlen(
         The operation supports first-order gradients with respect to ``q``, ``k``,
         and ``v``.
     """
-    raise NotImplementedError("flash_attention_varlen is not implemented yet")
+    raise NotImplementedError("flash_attention_varlen_func is not implemented yet")

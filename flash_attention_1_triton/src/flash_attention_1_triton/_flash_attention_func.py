@@ -7,7 +7,7 @@ from torch import Tensor
 
 
 @jaxtyped(typechecker=beartype)
-def flash_attention(
+def flash_attention_func(
     q: (
         Float16[Tensor, "batch query_length heads head_dim"]
         | BFloat16[Tensor, "batch query_length heads head_dim"]
@@ -49,4 +49,4 @@ def flash_attention(
         and a contiguous final dimension. The operation supports first-order gradients
         with respect to ``q``, ``k``, and ``v``.
     """
-    raise NotImplementedError("flash_attention is not implemented yet")
+    raise NotImplementedError("flash_attention_func is not implemented yet")
