@@ -4,14 +4,14 @@ GPU kernel experiments built with PyTorch, Triton, and NVIDIA CuTe DSL.
 
 ## Minimum requirements
 
-| Component | Requirement |
-| --- | --- |
-| GPU | NVIDIA H100 (SM90, compute capability 9.0) |
-| OS | Linux (Ubuntu 24.04) |
-| NVIDIA driver | 575.51.03 or newer |
-| CUDA toolkit | 12.9.1 |
-| Python | 3.12 or 3.13 (managed by `uv`) |
-| Package manager | `uv` |
+| Component       | Requirement                                |
+| --------------- | ------------------------------------------ |
+| GPU             | NVIDIA H100 (SM90, compute capability 9.0) |
+| OS              | Linux (Ubuntu 24.04)                       |
+| NVIDIA driver   | 575.51.03 or newer                         |
+| CUDA toolkit    | 12.9.1                                     |
+| Python          | 3.12 or 3.13 (managed by `uv`)             |
+| Package manager | `uv`                                       |
 
 RAM and VRAM minimums are not defined. The current verification script requires an H100.
 
@@ -47,7 +47,7 @@ uv sync --locked
 ## Verify the GPU stack
 
 ```bash
-uv run --locked python scripts/verify_gpu_stack.py
+uv run --locked scripts/verify_gpu_stack.py
 ```
 
 Successful verification includes:

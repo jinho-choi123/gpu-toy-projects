@@ -10,7 +10,7 @@ supported-markers = [
 
 [manifest]
 members = [
-    "flash-attention-triton",
+    "flash-attention-1-triton",
     "gpu-toys",
 ]
 
@@ -174,9 +174,9 @@ wheels = [
 ]
 
 [[package]]
-name = "flash-attention-triton"
+name = "flash-attention-1-triton"
 version = "0.1.0"
-source = { editable = "flash_attention_triton" }
+source = { editable = "flash_attention_1_triton" }
 
 [[package]]
 name = "fsspec"
@@ -192,11 +192,12 @@ name = "gpu-toys"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "flash-attention-triton" },
+    { name = "flash-attention-1-triton" },
     { name = "loguru" },
     { name = "nvidia-cutlass-dsl" },
     { name = "nvidia-nvshmem-cu12" },
     { name = "nvshmem4py-cu12" },
+    { name = "pytest-env" },
     { name = "torch" },
 ]
 
@@ -213,11 +214,12 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "flash-attention-triton", editable = "flash_attention_triton" },
+    { name = "flash-attention-1-triton", editable = "flash_attention_1_triton" },
     { name = "loguru", specifier = "==0.7.3" },
     { name = "nvidia-cutlass-dsl", specifier = "==4.6.1" },
     { name = "nvidia-nvshmem-cu12", specifier = "==3.4.5" },
     { name = "nvshmem4py-cu12", specifier = "==0.3.1" },
+    { name = "pytest-env", specifier = ">=1.7.0" },
     { name = "torch", marker = "sys_platform != 'linux'", specifier = "==2.11.0" },
     { name = "torch", marker = "sys_platform == 'linux'", specifier = "==2.11.0", index = "https://download.pytorch.org/whl/cu129" },
 ]
@@ -694,6 +696,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-env"
+version = "1.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+    { name = "python-dotenv" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/65/49/08ee056f9cc655e437abcf2ae399884844b623223476ae6a77244131db03/pytest_env-1.7.0.tar.gz", hash = "sha256:0c1dc1101fb8d3ab3611e8f8d657ba06c3c0c167fc85c90457e5b27f2508f43e", size = 16408, upload-time = "2026-07-21T13:09:21.834Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3e/fc/9f2975c41d41bf5bd9a7d0fc03085ec20052b456b079df53828ae4a1b100/pytest_env-1.7.0-py3-none-any.whl", hash = "sha256:9ee0f1fe859d23fcdb533fe2909a404b3b133d02674a56df275bbe4df4eb104b", size = 10263, upload-time = "2026-07-21T13:09:20.677Z" },
+]
+
+[[package]]
 name = "python-discovery"
 version = "1.5.1"
 source = { registry = "https://pypi.org/simple" }
@@ -703,6 +718,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/04/b7/1581a8103855c43567776aa34135e5ec3c597346c23bfd10c7eb5e0b10a4/python_discovery-1.5.1.tar.gz", hash = "sha256:e2ea8b884cd1701f386eda8cf327b87743f1dc21b7f784470799537d95635384", size = 77200, upload-time = "2026-07-31T22:06:02.48Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6a/07/a89b539750a159d5101c4eb9fc84e2961f65cefbd5e0b7440b284471c0b0/python_discovery-1.5.1-py3-none-any.whl", hash = "sha256:ac07f44cade589d954e9d6a1e1468539fdddd2cf676beb51da73e0f156b7c932", size = 35752, upload-time = "2026-07-31T22:06:01.116Z" },
+]
+
+[[package]]
+name = "python-dotenv"
+version = "1.2.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/53/ed9d74092561d4b01a2ef1349d52cdbc135e526c245f366b089cfca6de49/python_dotenv-1.2.3.tar.gz", hash = "sha256:a20a594dabeaa385725aa239d5244871c143ecb356add8a20fcf23773a6c3a35", size = 58945, upload-time = "2026-08-16T16:54:54.067Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/17/c5c6b53ddc18f297992099b3d9ec16c855c0ccc83263a21fe4d1c625ec6c/python_dotenv-1.2.3-py3-none-any.whl", hash = "sha256:904552145e8bfed22162c09dab1c2b9b54fefa7b23ba780f4f26ca0316b0f0d9", size = 22780, upload-time = "2026-08-16T16:54:52.473Z" },
 ]
 
 [[package]]

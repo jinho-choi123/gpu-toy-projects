@@ -8,12 +8,13 @@ authors = [
 ]
 requires-python = ">=3.12,<3.14"
 dependencies = [
-    "flash_attention_triton",
+    "flash_attention_1_triton",
     "loguru==0.7.3",
     "nvidia-cutlass-dsl==4.6.1",
     "nvidia-nvshmem-cu12==3.4.5",
     "nvshmem4py-cu12==0.3.1",
-    "torch==2.11.0"
+    "pytest-env>=1.7.0",
+    "torch==2.11.0",
 ]
 
 [dependency-groups]
@@ -33,11 +34,11 @@ environments = ["sys_platform == 'linux'"]
 
 [tool.uv.workspace]
 members = [
-    "flash_attention_triton",
+    "flash_attention_1_triton",
 ]
 
 [tool.uv.sources]
-"flash_attention_triton" = {workspace=true}
+"flash_attention_1_triton" = {workspace=true}
 torch = [
     { index = "pytorch-cu129", marker = "sys_platform == 'linux'" },
 ]
@@ -46,3 +47,31 @@ torch = [
 name = "pytorch-cu129"
 url = "https://download.pytorch.org/whl/cu129"
 explicit = true
+
+[pytest_env]
+CUDA_VISIBLE_DEVICES="0"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "T201", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.ty.environment]
+python = ".venv"
+python-version = "3.13"
+root = ["."]
+
+[tool.ty.src]
+include = ["flash_attention_1_triton"]
+exclude = ["docs/"]
