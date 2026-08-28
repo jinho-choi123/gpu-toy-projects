@@ -191,7 +191,6 @@ dependencies = [
     { name = "nvidia-cutlass-dsl" },
     { name = "nvidia-nvshmem-cu12" },
     { name = "nvshmem4py-cu12" },
-    { name = "pytest-env" },
     { name = "torch" },
 ]
 
@@ -202,6 +201,7 @@ dev = [
     { name = "pre-commit" },
     { name = "pybind11" },
     { name = "pytest" },
+    { name = "pytest-env" },
     { name = "ruff" },
     { name = "ty" },
 ]
@@ -213,7 +213,6 @@ requires-dist = [
     { name = "nvidia-cutlass-dsl", specifier = "==4.6.1" },
     { name = "nvidia-nvshmem-cu12", specifier = "==3.4.5" },
     { name = "nvshmem4py-cu12", specifier = "==0.3.1" },
-    { name = "pytest-env", specifier = ">=1.7.0" },
     { name = "torch", marker = "sys_platform != 'linux'", specifier = "==2.11.0" },
     { name = "torch", marker = "sys_platform == 'linux'", specifier = "==2.11.0", index = "https://download.pytorch.org/whl/cu129" },
 ]
@@ -225,6 +224,7 @@ dev = [
     { name = "pre-commit", specifier = "==4.6.0" },
     { name = "pybind11", specifier = "==3.0.4" },
     { name = "pytest", specifier = "==9.0.3" },
+    { name = "pytest-env", specifier = ">=1.7.0" },
     { name = "ruff", specifier = "==0.15.14" },
     { name = "ty", specifier = "==0.0.38" },
 ]
