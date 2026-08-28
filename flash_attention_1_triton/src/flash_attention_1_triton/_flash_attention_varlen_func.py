@@ -39,7 +39,9 @@ def flash_attention_varlen_func(
         cu_seqlens_k: CUDA int32 cumulative key lengths shaped ``[batch + 1]``.
         max_seqlen_q: Exact maximum query length in the batch.
         max_seqlen_k: Exact maximum key length in the batch.
-        causal: Whether to apply a bottom-right-aligned causal mask.
+        causal: Whether to apply a bottom-right-aligned causal mask. When ``True``,
+            each query sequence must not be longer than its corresponding key
+            sequence.
         softmax_scale: Positive finite scale applied before softmax. Defaults to
             ``1 / sqrt(head_dim)``.
 
@@ -47,13 +49,15 @@ def flash_attention_varlen_func(
         A contiguous tensor shaped like ``q`` and with the same dtype and device.
 
     Raises:
+        ValueError: If ``causal=True`` and any query sequence is longer than its
+            corresponding key sequence.
         NotImplementedError: Always, until the FlashAttention implementation is added.
 
     Note:
-        ``q``, ``k``, and ``v`` must be CUDA FP16 or BF16 tensors on the same device.
-        They must have the same number of heads, a head dimension of 32, 64, or 128,
-        and a contiguous final dimension. Each encoded sequence must be non-empty.
-        The operation supports first-order gradients with respect to ``q``, ``k``,
-        and ``v``.
+        ``q``, ``k``, and ``v`` must be CUDA tensors on the same device with the same
+        FP16 or BF16 dtype. They must have the same number of heads, a head dimension
+        of 32, 64, or 128, and a contiguous final dimension. Each encoded sequence
+        must be non-empty. The operation supports first-order gradients with respect
+        to ``q``, ``k``, and ``v``.
     """
     raise NotImplementedError("flash_attention_varlen_func is not implemented yet")

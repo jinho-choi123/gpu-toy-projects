@@ -180,6 +180,19 @@ wheels = [
 name = "flash-attention-1-triton"
 version = "0.1.0"
 source = { editable = "flash_attention_1_triton" }
+dependencies = [
+    { name = "beartype" },
+    { name = "jaxtyping" },
+    { name = "torch" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beartype", specifier = ">=0.22.9" },
+    { name = "jaxtyping", specifier = ">=0.3.11" },
+    { name = "torch", marker = "sys_platform != 'linux'", specifier = "==2.11.0" },
+    { name = "torch", marker = "sys_platform == 'linux'", specifier = "==2.11.0", index = "https://download.pytorch.org/whl/cu129" },
+]
 
 [[package]]
 name = "fsspec"
@@ -195,9 +208,7 @@ name = "gpu-toys"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "beartype" },
     { name = "flash-attention-1-triton" },
-    { name = "jaxtyping" },
     { name = "loguru" },
     { name = "nvidia-cutlass-dsl" },
     { name = "nvidia-nvshmem-cu12" },
@@ -219,9 +230,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "beartype", specifier = ">=0.22.9" },
     { name = "flash-attention-1-triton", editable = "flash_attention_1_triton" },
-    { name = "jaxtyping", specifier = ">=0.3.11" },
     { name = "loguru", specifier = "==0.7.3" },
     { name = "nvidia-cutlass-dsl", specifier = "==4.6.1" },
     { name = "nvidia-nvshmem-cu12", specifier = "==3.4.5" },
