@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "flash_attention_1_triton",
+    "profile_flashqla",
     "loguru==0.7.3",
     "nvidia-cutlass-dsl==4.6.1",
     "nvidia-nvshmem-cu12==3.4.5",
@@ -35,10 +36,12 @@ environments = ["sys_platform == 'linux'"]
 [tool.uv.workspace]
 members = [
     "flash_attention_1_triton",
+    "profile_flashqla",
 ]
 
 [tool.uv.sources]
 "flash_attention_1_triton" = {workspace=true}
+"profile_flashqla" = {workspace=true}
 torch = [
     { index = "pytorch-cu129", marker = "sys_platform == 'linux'" },
 ]
