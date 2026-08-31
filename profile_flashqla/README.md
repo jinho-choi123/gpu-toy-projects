@@ -18,13 +18,13 @@ mkdir -p profile_flashqla/profiles
 ## Workload
 
 Defaults: `B=1`, `T=16384`, `H=16`, `K=V=128`, BF16 Q/K/V, FP32
-gate/beta/state, `cuda:0`, seed 42, 10 warmups, and 1 measured forward.
+gate/beta/state, `cuda:0`, seed 42, and 1 measured graph replay.
 
-The workload runs under `torch.inference_mode()` with final-state output and
-in-kernel Q/K L2 normalization enabled. Inputs are allocated once and reused.
+The workload always uses CUDA Graphs: 10 eager warmups on a side stream,
+one graph capture, and 10 graph replay warmups before measurement.
 
-Override `--batch-size`, `--seq-len`, `--num-heads`, `--seed`, `--warmup`,
-or `--iterations`. Run either script with `--help` for details.
+Override `--batch-size`, `--seq-len`, `--num-heads`, `--seed`, or
+`--iterations`. Run either script with `--help` for details.
 
 ## Direct execution
 
@@ -41,6 +41,7 @@ FlashQLA:
 nsys profile \
   --trace=cuda,nvtx \
   --sample=none \
+  --cuda-graph-trace=node \
   --capture-range=cudaProfilerApi \
   --capture-range-end=stop \
   --output=profile_flashqla/profiles/flash_qla_b1_t16384_h16_nsys \
@@ -54,6 +55,7 @@ FLA Triton:
 nsys profile \
   --trace=cuda,nvtx \
   --sample=none \
+  --cuda-graph-trace=node \
   --capture-range=cudaProfilerApi \
   --capture-range-end=stop \
   --output=profile_flashqla/profiles/fla_triton_b1_t16384_h16_nsys \
@@ -71,6 +73,7 @@ FlashQLA:
 ```bash
 ncu \
   --set basic \
+  --graph-profiling node \
   --nvtx \
   --nvtx-include 'gdn_forward/' \
   --profile-from-start=off \
@@ -84,6 +87,7 @@ FLA Triton:
 ```bash
 ncu \
   --set basic \
+  --graph-profiling node \
   --nvtx \
   --nvtx-include 'gdn_forward/' \
   --profile-from-start=off \

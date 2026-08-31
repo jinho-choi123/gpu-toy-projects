@@ -14,6 +14,8 @@ from loguru import logger
 
 HEAD_DIM = 128
 DTYPE = torch.bfloat16
+EAGER_WARMUP = 10
+GRAPH_WARMUP = 10
 
 
 class ProfileBackend(StrEnum):
@@ -31,7 +33,6 @@ class ProfileConfig:
     seq_len: int
     num_heads: int
     seed: int
-    warmup: int
     iterations: int
 
 
@@ -61,18 +62,11 @@ def _parse_args(argv: Sequence[str] | None) -> ProfileConfig:
             raise argparse.ArgumentTypeError("value must be positive")
         return value
 
-    def _non_negative_int(raw: str) -> int:
-        value = int(raw)
-        if value < 0:
-            raise argparse.ArgumentTypeError("value must be non-negative")
-        return value
-
     parser = argparse.ArgumentParser(description="Profile a GDN forward implementation.")
     _ = parser.add_argument("--batch-size", type=_positive_int, default=1)
     _ = parser.add_argument("--seq-len", type=_positive_int, default=16_384)
     _ = parser.add_argument("--num-heads", type=_positive_int, default=16)
     _ = parser.add_argument("--seed", type=int, default=42)
-    _ = parser.add_argument("--warmup", type=_non_negative_int, default=10)
     _ = parser.add_argument("--iterations", type=_positive_int, default=1)
     args = parser.parse_args(argv)
 
@@ -81,7 +75,6 @@ def _parse_args(argv: Sequence[str] | None) -> ProfileConfig:
         seq_len=args.seq_len,
         num_heads=args.num_heads,
         seed=args.seed,
-        warmup=args.warmup,
         iterations=args.iterations,
     )
 
@@ -126,7 +119,8 @@ def main(backend: ProfileBackend, argv: Sequence[str] | None = None) -> int:
         "dtype": str(DTYPE).removeprefix("torch."),
         "device": device,
         "seed": config.seed,
-        "warmup": config.warmup,
+        "eager_warmup": EAGER_WARMUP,
+        "graph_warmup": GRAPH_WARMUP,
         "iterations": config.iterations,
     }
 
@@ -199,8 +193,22 @@ def main(backend: ProfileBackend, argv: Sequence[str] | None = None) -> int:
     forward: GdnForward = run_forward
 
     with torch.inference_mode():
-        for _ in range(config.warmup):
-            forward(gdn_input)
+        current_stream = torch.cuda.current_stream(device)
+        warmup_stream = torch.cuda.Stream(device=device)
+        warmup_stream.wait_stream(current_stream)
+
+        with torch.cuda.stream(warmup_stream):
+            for _ in range(EAGER_WARMUP):
+                forward(gdn_input)
+
+        current_stream.wait_stream(warmup_stream)
+
+        cuda_graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(cuda_graph):
+            _static_output, _static_final_state = forward(gdn_input)
+
+        for _ in range(GRAPH_WARMUP):
+            cuda_graph.replay()
 
         torch.cuda.synchronize(device)
 
@@ -209,7 +217,7 @@ def main(backend: ProfileBackend, argv: Sequence[str] | None = None) -> int:
             with torch.cuda.nvtx.range("gdn_forward"):
                 for iteration in range(config.iterations):
                     with torch.cuda.nvtx.range(f"iteration_{iteration}"):
-                        forward(gdn_input)
+                        cuda_graph.replay()
 
             torch.cuda.synchronize(device)
         finally:
