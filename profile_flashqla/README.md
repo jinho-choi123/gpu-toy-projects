@@ -72,9 +72,9 @@ FlashQLA:
 ncu \
   --set basic \
   --nvtx \
-  --nvtx-include gdn_forward \
+  --nvtx-include 'gdn_forward/' \
   --profile-from-start=off \
-  --output=profile_flashqla/profiles/flash_qla_b1_t16384_h16_ncu \
+  --export=profile_flashqla/profiles/flash_qla_b1_t16384_h16_ncu \
   .venv/bin/python profile_flashqla/scripts/profile_gdn_flash_qla.py \
   --iterations 1
 ```
@@ -85,9 +85,9 @@ FLA Triton:
 ncu \
   --set basic \
   --nvtx \
-  --nvtx-include gdn_forward \
+  --nvtx-include 'gdn_forward/' \
   --profile-from-start=off \
-  --output=profile_flashqla/profiles/fla_triton_b1_t16384_h16_ncu \
+  --export=profile_flashqla/profiles/fla_triton_b1_t16384_h16_ncu \
   .venv/bin/python profile_flashqla/scripts/profile_gdn_fla_triton.py \
   --iterations 1
 ```
