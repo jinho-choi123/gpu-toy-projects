@@ -60,8 +60,7 @@ def run_chunk_gated_delta_rule(gdn_input: GdnInput) -> tuple[torch.Tensor, torch
     return output, final_state
 
 
-@pytest.fixture
-def gdn_input_fixture() -> GdnInput:
+def make_gdn_input(*, seq_len: int, num_heads: int) -> GdnInput:
     """Create deterministic GDN inputs."""
     assert torch.cuda.is_available(), "CUDA is required for this test"
     capability = torch.cuda.get_device_capability(0)
@@ -70,26 +69,67 @@ def gdn_input_fixture() -> GdnInput:
         f"(H100/H200); found SM{capability[0]}{capability[1]}."
     )
     batch_size = 1
-    seq_len = 1024
-    num_heads = 4
     head_dim = 128
     device = torch.device("cuda:0")
 
     torch.manual_seed(42)
 
-    q = torch.randn(batch_size, seq_len, num_heads, head_dim, device=device, dtype=torch.bfloat16)
+    q = torch.randn(
+        batch_size,
+        seq_len,
+        num_heads,
+        head_dim,
+        device=device,
+        dtype=torch.bfloat16,
+    )
     k = torch.randn_like(q)
     v = torch.randn_like(q)
     g = F.logsigmoid(
-        torch.randn(batch_size, seq_len, num_heads, device=device, dtype=torch.float32)
+        torch.randn(
+            batch_size,
+            seq_len,
+            num_heads,
+            device=device,
+            dtype=torch.float32,
+        )
     )
-    beta = torch.randn(batch_size, seq_len, num_heads, device=device, dtype=torch.float32).sigmoid()
+    beta = torch.randn(
+        batch_size,
+        seq_len,
+        num_heads,
+        device=device,
+        dtype=torch.float32,
+    ).sigmoid()
     initial_state = torch.randn(
-        batch_size, num_heads, head_dim, head_dim, device=device, dtype=torch.float32
+        batch_size,
+        num_heads,
+        head_dim,
+        head_dim,
+        device=device,
+        dtype=torch.float32,
     )
-    scale = head_dim**-0.5
 
-    return GdnInput(q=q, k=k, v=v, g=g, beta=beta, initial_state=initial_state, scale=scale)
+    return GdnInput(
+        q=q,
+        k=k,
+        v=v,
+        g=g,
+        beta=beta,
+        initial_state=initial_state,
+        scale=head_dim**-0.5,
+    )
+
+
+@pytest.fixture
+def gdn_input_fixture() -> GdnInput:
+    """Create the small deterministic GDN test workload."""
+    return make_gdn_input(seq_len=1024, num_heads=4)
+
+
+@pytest.fixture
+def gdn_long_context_input_fixture() -> GdnInput:
+    """Create the canonical long-context GDN test workload."""
+    return make_gdn_input(seq_len=16_384, num_heads=16)
 
 
 def test_flash_qla_backend_imports() -> None:
@@ -156,4 +196,26 @@ def test_flash_qla_matches_fla_triton(
     assert_close("output", golden_output, flash_qla_output, ratio=_FLASH_QLA_ERROR_RATIO)
     assert_close(
         "final_state", golden_final_state, flash_qla_final_state, ratio=_FLASH_QLA_ERROR_RATIO
+    )
+
+
+def test_flash_qla_matches_fla_triton_long_context(
+    monkeypatch: pytest.MonkeyPatch,
+    gdn_long_context_input_fixture: GdnInput,
+) -> None:
+    """Verify FlashQLA against FLA Triton for the long-context workload."""
+    monkeypatch.setenv("FLA_FLASH_QLA", "0")
+    golden_output, golden_final_state = run_chunk_gated_delta_rule(gdn_long_context_input_fixture)
+
+    monkeypatch.setenv("FLA_FLASH_QLA", "1")
+    flash_qla_output, flash_qla_final_state = run_chunk_gated_delta_rule(
+        gdn_long_context_input_fixture
+    )
+
+    assert_close("output", golden_output, flash_qla_output, ratio=_FLASH_QLA_ERROR_RATIO)
+    assert_close(
+        "final_state",
+        golden_final_state,
+        flash_qla_final_state,
+        ratio=_FLASH_QLA_ERROR_RATIO,
     )

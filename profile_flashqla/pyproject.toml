@@ -10,6 +10,7 @@ authors = [
 dependencies = [
     "flash-linear-attention==0.5.2",
     "flash-qla==0.1.2",
+    "loguru==0.7.3",
 ]
 
 [build-system]
