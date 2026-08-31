@@ -63,7 +63,7 @@ nsys profile \
   --iterations 10
 ```
 
-Capture contains `gdn_forward` with one `iteration_N` range per forward.
+Capture contains `gdn_forward` with one `iteration_N` range per measured graph replay.
 Input allocation, JIT compilation, and warmup occur before capture.
 
 ## Nsight Compute

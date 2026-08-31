@@ -79,5 +79,5 @@ extra-paths = [
 ]
 
 [tool.ty.src]
-include = ["flash_attention_1_triton", "scripts"]
+include = ["flash_attention_1_triton", "profile_flashqla", "scripts"]
 exclude = ["docs/"]

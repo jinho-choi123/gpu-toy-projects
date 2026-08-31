@@ -1,29 +1,15 @@
 """Verify Flash QLA integration through the FLA GDN API."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
 
 import pytest
 import torch
 import torch.nn.functional as F
-from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 from fla.ops.gated_delta_rule.backends.flash_qla import FlashQLABackend
 from fla.utils import assert_close
+from profile_flashqla.utils import GdnInput, run_forward
 
 _FLASH_QLA_ERROR_RATIO = 0.008
-
-
-@dataclass(frozen=True, slots=True)
-class GdnInput:
-    """Dataclass to hold GDN inputs for testing."""
-
-    q: torch.Tensor
-    k: torch.Tensor
-    v: torch.Tensor
-    g: torch.Tensor
-    beta: torch.Tensor
-    initial_state: torch.Tensor
-    scale: float
 
 
 # Helper function
@@ -41,23 +27,6 @@ def record_calls[**P, R](
         return func(*args, **kwargs)
 
     return wrapper
-
-
-# Helper function
-def run_chunk_gated_delta_rule(gdn_input: GdnInput) -> tuple[torch.Tensor, torch.Tensor]:
-    """Run the chunk_gated_delta_rule function with the provided GDN inputs."""
-    output, final_state = chunk_gated_delta_rule(  # pyright: ignore[reportCallIssue]
-        q=gdn_input.q,  # pyright: ignore[reportCallIssue]
-        k=gdn_input.k,  # pyright: ignore[reportCallIssue]
-        v=gdn_input.v,  # pyright: ignore[reportCallIssue]
-        g=gdn_input.g,  # pyright: ignore[reportCallIssue]
-        beta=gdn_input.beta,  # pyright: ignore[reportCallIssue]
-        scale=gdn_input.scale,  # pyright: ignore[reportCallIssue]
-        initial_state=gdn_input.initial_state,  # pyright: ignore[reportCallIssue]
-        output_final_state=True,  # pyright: ignore[reportCallIssue]
-        use_qk_l2norm_in_kernel=True,  # pyright: ignore[reportCallIssue]
-    )
-    return output, final_state
 
 
 def make_gdn_input(*, seq_len: int, num_heads: int) -> GdnInput:
@@ -155,7 +124,7 @@ def test_fla_dispatches_to_flash_qla(
     monkeypatch.setenv("FLA_FLASH_QLA", "1")
 
     # Run GDN
-    _ = run_chunk_gated_delta_rule(gdn_input_fixture)
+    _ = run_forward(gdn_input_fixture)
 
     assert len(is_called) != 0, "FLA did not dispatch GDN forward to FlashQLA."
 
@@ -177,7 +146,7 @@ def test_fla_dispatches_to_fla_triton(
     monkeypatch.setenv("FLA_FLASH_QLA", "0")
 
     # Run GDN
-    _ = run_chunk_gated_delta_rule(gdn_input_fixture)
+    _ = run_forward(gdn_input_fixture)
 
     assert len(is_called) == 0, "FLA should not dispatch GDN to FlashQLA."
 
@@ -188,10 +157,10 @@ def test_flash_qla_matches_fla_triton(
 ) -> None:
     """Verify that FlashQLA matches FLA's Triton implementation for GDN."""
     monkeypatch.setenv("FLA_FLASH_QLA", "0")
-    golden_output, golden_final_state = run_chunk_gated_delta_rule(gdn_input_fixture)
+    golden_output, golden_final_state = run_forward(gdn_input_fixture)
 
     monkeypatch.setenv("FLA_FLASH_QLA", "1")
-    flash_qla_output, flash_qla_final_state = run_chunk_gated_delta_rule(gdn_input_fixture)
+    flash_qla_output, flash_qla_final_state = run_forward(gdn_input_fixture)
 
     assert_close("output", golden_output, flash_qla_output, ratio=_FLASH_QLA_ERROR_RATIO)
     assert_close(
@@ -205,12 +174,10 @@ def test_flash_qla_matches_fla_triton_long_context(
 ) -> None:
     """Verify FlashQLA against FLA Triton for the long-context workload."""
     monkeypatch.setenv("FLA_FLASH_QLA", "0")
-    golden_output, golden_final_state = run_chunk_gated_delta_rule(gdn_long_context_input_fixture)
+    golden_output, golden_final_state = run_forward(gdn_long_context_input_fixture)
 
     monkeypatch.setenv("FLA_FLASH_QLA", "1")
-    flash_qla_output, flash_qla_final_state = run_chunk_gated_delta_rule(
-        gdn_long_context_input_fixture
-    )
+    flash_qla_output, flash_qla_final_state = run_forward(gdn_long_context_input_fixture)
 
     assert_close("output", golden_output, flash_qla_output, ratio=_FLASH_QLA_ERROR_RATIO)
     assert_close(

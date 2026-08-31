@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import argparse
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
 import torch
 import torch.nn.functional as F
 from loguru import logger
+
+from .utils import GdnInput, run_forward
 
 HEAD_DIM = 128
 DTYPE = torch.bfloat16
@@ -34,25 +36,6 @@ class ProfileConfig:
     num_heads: int
     seed: int
     iterations: int
-
-
-@dataclass(frozen=True, slots=True)
-class GdnInput:
-    """Inputs reused by every warmup and measured forward."""
-
-    q: torch.Tensor
-    k: torch.Tensor
-    v: torch.Tensor
-    g: torch.Tensor
-    beta: torch.Tensor
-    initial_state: torch.Tensor
-    scale: float
-
-
-GdnForward = Callable[
-    [GdnInput],
-    tuple[torch.Tensor, torch.Tensor],
-]
 
 
 def _parse_args(argv: Sequence[str] | None) -> ProfileConfig:
@@ -171,27 +154,6 @@ def main(backend: ProfileBackend, argv: Sequence[str] | None = None) -> int:
     )
 
     # RUN FORWARD
-
-    from fla.ops.gated_delta_rule import chunk_gated_delta_rule
-
-    def run_forward(gdn_input: GdnInput) -> tuple[torch.Tensor, torch.Tensor]:
-        output, final_state = chunk_gated_delta_rule(  # pyright: ignore[reportCallIssue]
-            q=gdn_input.q,  # pyright: ignore[reportCallIssue]
-            k=gdn_input.k,  # pyright: ignore[reportCallIssue]
-            v=gdn_input.v,  # pyright: ignore[reportCallIssue]
-            g=gdn_input.g,  # pyright: ignore[reportCallIssue]
-            beta=gdn_input.beta,  # pyright: ignore[reportCallIssue]
-            scale=gdn_input.scale,  # pyright: ignore[reportCallIssue]
-            initial_state=gdn_input.initial_state,  # pyright: ignore[reportCallIssue]
-            output_final_state=True,  # pyright: ignore[reportCallIssue]
-            use_qk_l2norm_in_kernel=True,  # pyright: ignore[reportCallIssue]
-        )
-        if final_state is None:
-            raise RuntimeError("GDN forward did not return the requested final state.")
-        return output, final_state
-
-    forward: GdnForward = run_forward
-
     with torch.inference_mode():
         current_stream = torch.cuda.current_stream(device)
         warmup_stream = torch.cuda.Stream(device=device)
@@ -199,13 +161,13 @@ def main(backend: ProfileBackend, argv: Sequence[str] | None = None) -> int:
 
         with torch.cuda.stream(warmup_stream):
             for _ in range(EAGER_WARMUP):
-                forward(gdn_input)
+                _ = run_forward(gdn_input)
 
         current_stream.wait_stream(warmup_stream)
 
         cuda_graph = torch.cuda.CUDAGraph()
         with torch.cuda.graph(cuda_graph):
-            _static_output, _static_final_state = forward(gdn_input)
+            _static_output, _static_final_state = run_forward(gdn_input)
 
         for _ in range(GRAPH_WARMUP):
             cuda_graph.replay()
