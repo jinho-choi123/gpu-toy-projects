@@ -33,6 +33,17 @@ uv run python profile_flashqla/scripts/profile_gdn_flash_qla.py
 uv run python profile_flashqla/scripts/profile_gdn_fla_triton.py
 ```
 
+## CUDA memory snapshot
+
+Each run records one warmed-up eager forward and writes a snapshot to
+`profile_flashqla/profiles/{backend}_b{B}_t{T}_h{H}_memory_snapshot.pickle`.
+Open [PyTorch Memory Visualizer](https://pytorch.org/memory_viz), then drag and
+drop the snapshot file to inspect allocation and free events over time.
+
+For a numeric comparison, use `memory_forward_peak_delta_mib` from the command
+output. Memory recording ends before CUDA Graph capture and the Nsight profiling
+range, so it is excluded from the Nsight measurement.
+
 ## Nsight Systems
 
 FlashQLA:
