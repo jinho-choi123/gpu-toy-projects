@@ -7,6 +7,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -18,6 +19,9 @@ HEAD_DIM = 128
 DTYPE = torch.bfloat16
 EAGER_WARMUP = 10
 GRAPH_WARMUP = 10
+MEMORY_HISTORY_MAX_ENTRIES = 100_000
+BYTES_PER_MIB = 1024**2
+PROFILES_DIR = Path(__file__).resolve().parents[2] / "profiles"
 
 
 class ProfileBackend(StrEnum):
@@ -60,6 +64,94 @@ def _parse_args(argv: Sequence[str] | None) -> ProfileConfig:
         seed=args.seed,
         iterations=args.iterations,
     )
+
+
+def _to_mib(num_bytes: int) -> float:
+    """Convert bytes to MiB."""
+    return num_bytes / BYTES_PER_MIB
+
+
+def _profile_eager_forward_memory(
+    backend: ProfileBackend,
+    config: ProfileConfig,
+    device: torch.device,
+    gdn_input: GdnInput,
+) -> None:
+    """Capture memory history for one warmed-up eager GDN forward."""
+    PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+    snapshot_path = PROFILES_DIR / (
+        f"{backend.value}_b{config.batch_size}_t{config.seq_len}"
+        f"_h{config.num_heads}_memory_snapshot.pickle"
+    )
+
+    # Complete all warmup work and remove unused allocator cache so that the
+    # baseline consists of live inputs and persistent runtime allocations.
+    torch.cuda.synchronize(device)
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats(device)
+
+    allocated_before = torch.cuda.memory_allocated(device)
+    reserved_before = torch.cuda.memory_reserved(device)
+
+    torch.cuda.memory._record_memory_history(
+        enabled="all",
+        context="all",
+        stacks="all",
+        max_entries=MEMORY_HISTORY_MAX_ENTRIES,
+        device=device,
+        clear_history=True,
+    )
+
+    try:
+        memory_output, memory_final_state = run_forward(gdn_input)
+        torch.cuda.synchronize(device)
+
+        # Read these values while both returned tensors are still alive.
+        allocated_after = torch.cuda.memory_allocated(device)
+        reserved_after = torch.cuda.memory_reserved(device)
+        peak_allocated = torch.cuda.max_memory_allocated(device)
+        peak_reserved = torch.cuda.max_memory_reserved(device)
+
+        returned_tensor_bytes = (
+            memory_output.numel() * memory_output.element_size()
+            + memory_final_state.numel() * memory_final_state.element_size()
+        )
+
+        # Include the output deallocation events in the memory timeline.
+        del memory_output, memory_final_state
+        torch.cuda.synchronize(device)
+
+        torch.cuda.memory._dump_snapshot(str(snapshot_path))
+    finally:
+        # This must finish before torch.cuda.profiler.start().
+        torch.cuda.memory._record_memory_history(enabled=None, device=device)
+
+    logger.info(
+        " ".join(
+            [
+                f"memory_backend={backend.value}",
+                f"memory_baseline_allocated_mib={_to_mib(allocated_before):.2f}",
+                f"memory_after_forward_allocated_mib={_to_mib(allocated_after):.2f}",
+                f"memory_peak_allocated_mib={_to_mib(peak_allocated):.2f}",
+                (f"memory_forward_peak_delta_mib={_to_mib(peak_allocated - allocated_before):.2f}"),
+                (
+                    "memory_forward_retained_delta_mib="
+                    f"{_to_mib(allocated_after - allocated_before):.2f}"
+                ),
+                (f"memory_temporary_over_end_mib={_to_mib(peak_allocated - allocated_after):.2f}"),
+                f"memory_returned_tensors_mib={_to_mib(returned_tensor_bytes):.2f}",
+                f"memory_baseline_reserved_mib={_to_mib(reserved_before):.2f}",
+                f"memory_after_forward_reserved_mib={_to_mib(reserved_after):.2f}",
+                f"memory_peak_reserved_mib={_to_mib(peak_reserved):.2f}",
+                (f"memory_peak_reserved_delta_mib={_to_mib(peak_reserved - reserved_before):.2f}"),
+                f"memory_snapshot={snapshot_path}",
+            ]
+        )
+    )
+
+    # Do not let the eager memory-profiling run affect graph-private pool setup.
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize(device)
 
 
 def main(backend: ProfileBackend, argv: Sequence[str] | None = None) -> int:
@@ -161,9 +253,18 @@ def main(backend: ProfileBackend, argv: Sequence[str] | None = None) -> int:
 
         with torch.cuda.stream(warmup_stream):
             for _ in range(EAGER_WARMUP):
-                _ = run_forward(gdn_input)
+                run_forward(gdn_input)
 
         current_stream.wait_stream(warmup_stream)
+        torch.cuda.synchronize(device)
+        # Measure one warmed-up eager forward. Memory recording is stopped
+        # completely before CUDA Graph capture and Nsight profiling.
+        _profile_eager_forward_memory(
+            backend=backend,
+            config=config,
+            device=device,
+            gdn_input=gdn_input,
+        )
 
         cuda_graph = torch.cuda.CUDAGraph()
         with torch.cuda.graph(cuda_graph):
