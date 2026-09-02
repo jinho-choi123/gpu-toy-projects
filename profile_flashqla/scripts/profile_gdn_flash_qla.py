@@ -1,6 +1,6 @@
 """Profile GDN forward through FLA's FlashQLA backend."""
 
-from profile_flashqla.utils import isolate_jit_caches
+from profile_flashqla.isolate_jit_caches import isolate_jit_caches
 
 if __name__ == "__main__":
     with isolate_jit_caches(prefix="profile-gdn-flash-qla-"):
