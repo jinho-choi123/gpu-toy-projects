@@ -1,6 +1,10 @@
 """Profile GDN forward through FLA's FlashQLA backend."""
 
-from profile_flashqla.gdn_profile import ProfileBackend, main
+from profile_flashqla.isolate_jit_caches import isolate_jit_caches
 
 if __name__ == "__main__":
-    raise SystemExit(main(ProfileBackend.FLASH_QLA))
+    with isolate_jit_caches(prefix="profile-gdn-flash-qla-"):
+        # Cache 환경 설정 뒤에만 torch/FLA/FlashQLA를 import한다.
+        from profile_flashqla.gdn_profile import ProfileBackend, main
+
+        raise SystemExit(main(ProfileBackend.FLASH_QLA))
