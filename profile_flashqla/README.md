@@ -15,6 +15,36 @@ uv sync
 mkdir -p profile_flashqla/profiles
 ```
 
+## Qwen3.8-27B checkpoint prefill
+
+Profiles all 48 GDN layers in pinned `Qwen/Qwen3.8-27B`; choose `T=16384`,
+`32768`, or `65536`. Set `BACKEND=fla_triton` for the baseline.
+
+```bash
+BACKEND=flash_qla
+SCRIPT="profile_flashqla/scripts/profile_qwen38_27b_${BACKEND}.py"
+
+# Torch memory snapshot + one measured prefill
+uv run python "$SCRIPT" --seq-len 16384
+
+# Nsight Systems
+nsys profile --trace=cuda,nvtx --sample=none \
+  --capture-range=cudaProfilerApi --capture-range-end=stop \
+  --output="profile_flashqla/profiles/qwen38_27b_${BACKEND}_b1_t16384_nsys" \
+  .venv/bin/python "$SCRIPT" --seq-len 16384
+
+# Nsight Compute: GDN kernels only
+ncu --set basic --nvtx \
+  --nvtx-include 'regex:qwen38_gdn_decoder_layer_[0-9]+_gdn_ordinal_[0-9]+/' \
+  --profile-from-start=off \
+  --export="profile_flashqla/profiles/qwen38_27b_${BACKEND}_b1_t16384_ncu" \
+  .venv/bin/python "$SCRIPT" --seq-len 16384
+```
+
+Outputs are `*.nsys-rep`, `*.ncu-rep`, and
+`qwen38_27b_${BACKEND}_b1_t16384_memory_snapshot.pickle` under
+`profile_flashqla/profiles/`. The first run downloads the checkpoint.
+
 ## Workload
 
 Defaults: `B=1`, `T=16384`, `H=16`, `K=V=128`, BF16 Q/K/V, FP32
