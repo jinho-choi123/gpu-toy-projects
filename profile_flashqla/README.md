@@ -95,20 +95,25 @@ uv run --locked python scripts/profile_gdn_fla_triton.py \
 ## Full profiling sweep
 
 Run both backends with Nsight Systems and Nsight Compute for sequence lengths
-16K, 32K, and 64K and strong-decay head ratios `0.0`, `0.5`, and `1.0`:
+16K, 32K, and 64K. The synthetic GDN workload covers strong-decay head ratios
+`0.0`, `0.5`, and `1.0`; the Qwen3.8-27B workload profiles one full checkpoint
+prefill at each length:
 
 ```bash
 uv run --locked ./scripts/sweep_profiles.sh
 ```
 
-This runs 36 profiling jobs sequentially. Nsight Systems uses 10 measured graph
-replays per job, while Nsight Compute uses one. Completed jobs (both the Nsight
-report and memory snapshot exist) are skipped, so the same command can resume an
-interrupted sweep. If a profiler finished just before an interruption, the next
-run finalizes its pending snapshot before continuing. Memory snapshots are
-preserved separately as
-`{backend}_b{B}_t{T}_h{H}_sdh{N}_{profiler}_memory_snapshot.pickle`, so the
-Nsight Systems and Nsight Compute runs do not overwrite each other.
+This runs 48 profiling jobs sequentially: 36 synthetic GDN jobs and 12
+Qwen3.8-27B jobs. Nsight Systems uses 10 measured graph replays per synthetic
+job, while Nsight Compute uses one; each Qwen job measures one full prefill.
+Completed jobs (both the Nsight report and memory snapshot exist) are skipped,
+so the same command can resume an interrupted sweep. If a profiler finished
+just before an interruption, the next run finalizes its pending snapshot before
+continuing. Memory snapshots are preserved separately as
+`{backend}_b{B}_t{T}_h{H}_sdh{N}_{profiler}_memory_snapshot.pickle` for the
+synthetic workload and
+`qwen38_27b_{backend}_b1_t{T}_{profiler}_memory_snapshot.pickle` for Qwen, so
+the Nsight Systems and Nsight Compute runs do not overwrite each other.
 
 Preview what the sweep would run without running a profiler:
 
