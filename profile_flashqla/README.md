@@ -36,10 +36,9 @@ uv run --locked nsys profile --trace=cuda,nvtx --sample=none \
   --output="profiles/qwen38_27b_${BACKEND}_b1_t${SEQ_LEN}_nsys" \
   python "$SCRIPT" --seq-len "$SEQ_LEN"
 
-# Nsight Compute: GDN kernels only
-uv run --locked ncu --set basic --nvtx \
+# Nsight Compute: per-layer GDN ranges (avoids full-model kernel replay)
+uv run --locked ncu --section SpeedOfLight --replay-mode app-range --nvtx \
   --nvtx-include 'regex:qwen38_gdn_decoder_layer_[0-9]+_gdn_ordinal_[0-9]+/' \
-  --profile-from-start=off \
   --export="profiles/qwen38_27b_${BACKEND}_b1_t${SEQ_LEN}_ncu" \
   python "$SCRIPT" --seq-len "$SEQ_LEN"
 ```
@@ -105,7 +104,11 @@ uv run --locked ./scripts/sweep_profiles.sh
 
 This runs 48 profiling jobs sequentially: 36 synthetic GDN jobs and 12
 Qwen3.8-27B jobs. Nsight Systems uses 10 measured graph replays per synthetic
-job, while Nsight Compute uses one; each Qwen job measures one full prefill.
+job, while Nsight Compute uses one. Each Qwen job measures one full prefill;
+Qwen Nsight Compute jobs use application-range replay over the 48 per-layer
+GDN NVTX ranges. This avoids backing up the full model allocation for every
+individual kernel. Use Nsight Systems for timing comparisons because counter
+collection perturbs durations reported by Nsight Compute.
 Completed jobs (both the Nsight report and memory snapshot exist) are skipped,
 so the same command can resume an interrupted sweep. If a profiler finished
 just before an interruption, the next run finalizes its pending snapshot before

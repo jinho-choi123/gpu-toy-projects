@@ -225,18 +225,22 @@ run_profile() {
             else
                 cmd=(ncu)
             fi
-            cmd+=(
-                --set basic
-            )
             if [[ "${workload}" == gdn ]]; then
-                cmd+=(--graph-profiling node --nvtx --nvtx-include 'gdn_forward/')
+                cmd+=(
+                    --set basic
+                    --graph-profiling node
+                    --nvtx
+                    --nvtx-include 'gdn_forward/'
+                    --profile-from-start=off
+                )
             else
                 cmd+=(
+                    --section SpeedOfLight
+                    --replay-mode app-range
                     --nvtx
                     --nvtx-include 'regex:qwen38_gdn_decoder_layer_[0-9]+_gdn_ordinal_[0-9]+/'
                 )
             fi
-            cmd+=(--profile-from-start=off)
             if ((force == 1)); then
                 cmd+=(--force-overwrite)
             fi

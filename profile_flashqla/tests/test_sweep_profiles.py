@@ -11,7 +11,7 @@ SWEEP_SCRIPT = PROJECT_DIR / "scripts" / "sweep_profiles.sh"
 
 def _dry_run() -> str:
     return subprocess.run(
-        [SWEEP_SCRIPT, "--dry-run"],
+        [SWEEP_SCRIPT, "--dry-run", "--force"],
         cwd=PROJECT_DIR,
         check=True,
         capture_output=True,
@@ -45,7 +45,7 @@ def test_dry_run_schedules_every_qwen_profile() -> None:
                 for command in matching_commands
             )
             assert any(
-                "ncu --set basic" in command
+                "ncu --section SpeedOfLight --replay-mode app-range" in command
                 and f"qwen38_27b_{backend}_b1_t{seq_len}_ncu" in command
                 for command in matching_commands
             )
@@ -65,12 +65,18 @@ def test_dry_run_preserves_qwen_memory_snapshots_per_profiler() -> None:
         if line.startswith("  snapshot:") and "qwen38_27b_" in line
     ]
     nsys_commands = [line for line in qwen_commands if "nsys profile" in line]
-    ncu_commands = [line for line in qwen_commands if "ncu --set basic" in line]
+    ncu_commands = [
+        line
+        for line in qwen_commands
+        if "ncu --section SpeedOfLight --replay-mode app-range" in line
+    ]
 
+    assert len(nsys_commands) == 6
+    assert len(ncu_commands) == 6
     assert len(qwen_snapshots) == 12
     assert sum("_nsys_memory_snapshot.pickle" in line for line in qwen_snapshots) == 6
     assert sum("_ncu_memory_snapshot.pickle" in line for line in qwen_snapshots) == 6
     assert all("--capture-range=cudaProfilerApi" in command for command in nsys_commands)
     assert all("regex:qwen38_gdn_decoder_layer_" in command for command in ncu_commands)
-    assert all("--profile-from-start=off" in command for command in ncu_commands)
+    assert all("--profile-from-start" not in command for command in ncu_commands)
     assert all("--graph-profiling" not in command for command in ncu_commands)
