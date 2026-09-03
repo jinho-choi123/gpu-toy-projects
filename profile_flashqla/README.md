@@ -24,27 +24,28 @@ Profiles all 48 GDN layers in pinned `Qwen/Qwen3.8-27B`; choose `T=16384`,
 
 ```bash
 BACKEND=flash_qla
+SEQ_LEN=16384
 SCRIPT="scripts/profile_qwen38_27b_${BACKEND}.py"
 
 # Torch memory snapshot + one measured prefill
-uv run --locked python "$SCRIPT" --seq-len 16384
+uv run --locked python "$SCRIPT" --seq-len "$SEQ_LEN"
 
 # Nsight Systems
 uv run --locked nsys profile --trace=cuda,nvtx --sample=none \
   --capture-range=cudaProfilerApi --capture-range-end=stop \
-  --output="profiles/qwen38_27b_${BACKEND}_b1_t16384_nsys" \
-  python "$SCRIPT" --seq-len 16384
+  --output="profiles/qwen38_27b_${BACKEND}_b1_t${SEQ_LEN}_nsys" \
+  python "$SCRIPT" --seq-len "$SEQ_LEN"
 
 # Nsight Compute: GDN kernels only
 uv run --locked ncu --set basic --nvtx \
   --nvtx-include 'regex:qwen38_gdn_decoder_layer_[0-9]+_gdn_ordinal_[0-9]+/' \
   --profile-from-start=off \
-  --export="profiles/qwen38_27b_${BACKEND}_b1_t16384_ncu" \
-  python "$SCRIPT" --seq-len 16384
+  --export="profiles/qwen38_27b_${BACKEND}_b1_t${SEQ_LEN}_ncu" \
+  python "$SCRIPT" --seq-len "$SEQ_LEN"
 ```
 
 Outputs are `*.nsys-rep`, `*.ncu-rep`, and
-`qwen38_27b_${BACKEND}_b1_t16384_memory_snapshot.pickle` under
+`qwen38_27b_${BACKEND}_b1_t${SEQ_LEN}_memory_snapshot.pickle` under
 `profiles/`. The first run downloads the checkpoint.
 
 ## Workload
