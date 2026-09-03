@@ -13,7 +13,7 @@ dependencies = [
     "flash-qla==0.1.2",
     "loguru==0.7.3",
     "transformers==5.16.1",
-    "torch==2.8.0"
+    "torch==2.11.0"
 ]
 
 [tool.uv.sources]
@@ -67,7 +67,6 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
 
-
 [tool.ty.src]
-include = ["flash_attention_1_triton", "profile_flashqla", "scripts"]
+include = ["src", "scripts", "tests"]
 exclude = ["docs/"]

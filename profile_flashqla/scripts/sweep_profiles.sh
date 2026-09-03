@@ -4,9 +4,8 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "${script_dir}/.." && pwd)"
-repo_root="$(cd -- "${project_dir}/.." && pwd)"
 
-python_bin="${repo_root}/.venv/bin/python"
+python_bin="${VIRTUAL_ENV:-${project_dir}/.venv}/bin/python"
 profiles_dir="${project_dir}/profiles"
 ncu_root_tmpdir="/tmp/ncu-root"
 ncu_sudo_bin="/usr/local/cuda/bin/ncu"
@@ -257,7 +256,8 @@ done
 total_jobs=$((${#profilers[@]} * ${#backends[@]} * ${#sequence_lengths[@]} * ${#strong_decay_ratios[@]}))
 
 if ((dry_run == 0)); then
-    [[ -x "${python_bin}" ]] || fail "Python environment not found: ${python_bin}; run 'uv sync' first"
+    [[ -x "${python_bin}" ]] || fail \
+        "Python environment not found: ${python_bin}; run 'uv run --locked ./scripts/sweep_profiles.sh' from ${project_dir}"
     require_command nsys
     if ((sudo_ncu == 1)); then
         require_command sudo

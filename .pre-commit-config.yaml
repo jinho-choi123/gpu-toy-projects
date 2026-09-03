@@ -1,0 +1,65 @@
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v6.0.0
+      hooks:
+          - id: trailing-whitespace
+          - id: end-of-file-fixer
+          - id: check-yaml
+          - id: check-toml
+          - id: check-json
+          - id: check-added-large-files
+            args: [--maxkb=5120]
+          - id: check-merge-conflict
+          - id: mixed-line-ending
+            args: [--fix=lf]
+          - id: detect-private-key
+          - id: check-case-conflict
+          - id: debug-statements
+
+    - repo: local
+      hooks:
+          - id: profile-flashqla-ruff-check
+            name: profile_flashqla ruff check
+            entry: uv run --project profile_flashqla --locked ruff check --fix --force-exclude
+            language: system
+            files: ^profile_flashqla/
+            types_or: [python, pyi]
+            require_serial: true
+
+          - id: profile-flashqla-ruff-format
+            name: profile_flashqla ruff format
+            entry: uv run --project profile_flashqla --locked ruff format --force-exclude
+            language: system
+            files: ^profile_flashqla/
+            types_or: [python, pyi]
+            require_serial: true
+
+          - id: profile-flashqla-ty-check
+            name: profile_flashqla ty check
+            entry: uv run --project profile_flashqla --locked ty check --project profile_flashqla
+            language: system
+            files: ^profile_flashqla/
+            pass_filenames: false
+
+          - id: flash-attention-1-triton-ruff-check
+            name: flash_attention_1_triton ruff check
+            entry: uv run --project flash_attention_1_triton --locked ruff check --fix --force-exclude
+            language: system
+            files: ^flash_attention_1_triton/
+            types_or: [python, pyi]
+            require_serial: true
+
+          - id: flash-attention-1-triton-ruff-format
+            name: flash_attention_1_triton ruff format
+            entry: uv run --project flash_attention_1_triton --locked ruff format --force-exclude
+            language: system
+            files: ^flash_attention_1_triton/
+            types_or: [python, pyi]
+            require_serial: true
+
+          - id: flash-attention-1-triton-ty-check
+            name: flash_attention_1_triton ty check
+            entry: uv run --project flash_attention_1_triton --locked ty check --project flash_attention_1_triton
+            language: system
+            files: ^flash_attention_1_triton/
+            pass_filenames: false

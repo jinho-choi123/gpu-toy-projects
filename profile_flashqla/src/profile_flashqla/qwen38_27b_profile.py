@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from functools import wraps
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import torch
 from loguru import logger
@@ -387,7 +387,7 @@ def _instrument_gdn_calls(
             fallback_by_layer[current_decoder_layer] = fallback_fwd
             return result
 
-        fallback_module.get_warmup_chunks_bidi = wrapped_get_warmup_chunks_bidi
+        cast(Any, fallback_module).get_warmup_chunks_bidi = wrapped_get_warmup_chunks_bidi
 
     modeling_qwen3_5.torch_chunk_gated_delta_rule = wrapped_core
 
@@ -397,7 +397,7 @@ def _instrument_gdn_calls(
         modeling_qwen3_5.torch_chunk_gated_delta_rule = original_core
 
         if fallback_module is not None:
-            fallback_module.get_warmup_chunks_bidi = original_get_warmup_chunks_bidi
+            cast(Any, fallback_module).get_warmup_chunks_bidi = original_get_warmup_chunks_bidi
 
 
 def _log_fallback_fwd(
