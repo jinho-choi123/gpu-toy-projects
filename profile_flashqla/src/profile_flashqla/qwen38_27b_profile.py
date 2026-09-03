@@ -20,6 +20,7 @@ MODEL_ID = "Qwen/Qwen3.8-27B"
 MODEL_REVISION = "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
 
 DTYPE = torch.bfloat16
+ATTENTION_IMPLEMENTATION = "sdpa"
 SUPPORTED_SEQUENCE_LENGTHS = (16_384, 32_768, 65_536)
 NUM_GDN_LAYERS = 48
 LOGITS_TO_KEEP = 1
@@ -488,7 +489,7 @@ def main(
                 "batch_size=1",
                 f"seq_len={config.seq_len}",
                 f"dtype={str(DTYPE).removeprefix('torch.')}",
-                "attention_implementation=flash_attention_2",
+                f"attention_implementation={ATTENTION_IMPLEMENTATION}",
                 "use_cache=true",
                 f"logits_to_keep={LOGITS_TO_KEEP}",
                 "cuda_graph=false",
@@ -525,7 +526,7 @@ def main(
         revision=MODEL_REVISION,
         dtype=DTYPE,
         device_map=0,
-        attn_implementation="sdpa",
+        attn_implementation=ATTENTION_IMPLEMENTATION,
         use_kernels=False,
     )
     model.eval()
@@ -559,7 +560,7 @@ def main(
     attention_mask = torch.ones_like(input_ids)
 
     with torch.inference_mode():
-        # Pass 1: model, FLA, Triton, TileLang, and FlashAttention warmup.
+        # Pass 1: model, FLA, Triton, TileLang, and PyTorch SDPA warmup.
         logger.info("phase=eager_warmup iteration=1/1")
         for _ in range(EAGER_WARMUP):
             warmup_outputs = _run_prefill(

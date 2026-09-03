@@ -19,7 +19,8 @@ mkdir -p profiles
 ## Qwen3.8-27B checkpoint prefill
 
 Profiles all 48 GDN layers in pinned `Qwen/Qwen3.8-27B`; choose `T=16384`,
-`32768`, or `65536`. Set `BACKEND=fla_triton` for the baseline.
+`32768`, or `65536`. Full-attention layers use PyTorch SDPA. Set
+`BACKEND=fla_triton` for the GDN baseline.
 
 ```bash
 BACKEND=flash_qla
