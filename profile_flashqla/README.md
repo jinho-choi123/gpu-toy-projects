@@ -158,6 +158,7 @@ ncu \
   --profile-from-start=off \
   --export=profile_flashqla/profiles/flash_qla_b1_t16384_h16_sdh16_ncu \
   .venv/bin/python profile_flashqla/scripts/profile_gdn_flash_qla.py \
+  --seq-len 16384 \
   --strong-decay-head-ratio 1.0 \
   --iterations 1
 ```
@@ -173,6 +174,7 @@ ncu \
   --profile-from-start=off \
   --export=profile_flashqla/profiles/fla_triton_b1_t16384_h16_sdh16_ncu \
   .venv/bin/python profile_flashqla/scripts/profile_gdn_fla_triton.py \
+  --seq-len 16384 \
   --strong-decay-head-ratio 1.0 \
   --iterations 1
 ```
@@ -191,6 +193,7 @@ sudo env TMPDIR=/tmp/ncu-root /usr/local/cuda/bin/ncu \
   --profile-from-start=off \
   --export=profile_flashqla/profiles/flash_qla_b1_t16384_h16_sdh16_ncu \
   .venv/bin/python profile_flashqla/scripts/profile_gdn_flash_qla.py \
+  --seq-len 16384 \
   --strong-decay-head-ratio 1.0 \
   --iterations 1
 
@@ -203,77 +206,10 @@ sudo env TMPDIR=/tmp/ncu-root /usr/local/cuda/bin/ncu \
   --profile-from-start=off \
   --export=profile_flashqla/profiles/fla_triton_b1_t16384_h16_sdh16_ncu \
   .venv/bin/python profile_flashqla/scripts/profile_gdn_fla_triton.py \
+  --seq-len 16384 \
   --strong-decay-head-ratio 1.0 \
   --iterations 1
 ```
 
 Use `--set detailed` for deeper analysis. Keep `--iterations 1` because NCU
 may replay each captured kernel.
-
-## Sequence length 65536
-
-### Nsight Systems
-
-FlashQLA:
-
-```bash
-nsys profile \
-  --trace=cuda,nvtx \
-  --sample=none \
-  --cuda-graph-trace=node \
-  --capture-range=cudaProfilerApi \
-  --capture-range-end=stop \
-  --output=profile_flashqla/profiles/flash_qla_b1_t65536_h16_sdh16_nsys \
-  .venv/bin/python profile_flashqla/scripts/profile_gdn_flash_qla.py \
-  --seq-len 65536 \
-  --strong-decay-head-ratio 1.0 \
-  --iterations 10
-```
-
-FLA Triton:
-
-```bash
-nsys profile \
-  --trace=cuda,nvtx \
-  --sample=none \
-  --cuda-graph-trace=node \
-  --capture-range=cudaProfilerApi \
-  --capture-range-end=stop \
-  --output=profile_flashqla/profiles/fla_triton_b1_t65536_h16_sdh16_nsys \
-  .venv/bin/python profile_flashqla/scripts/profile_gdn_fla_triton.py \
-  --seq-len 65536 \
-  --strong-decay-head-ratio 1.0 \
-  --iterations 10
-```
-
-### Nsight Compute (`sudo`)
-
-```bash
-sudo install -d -m 700 /tmp/ncu-root
-
-# FlashQLA
-sudo env TMPDIR=/tmp/ncu-root /usr/local/cuda/bin/ncu \
-  --set basic \
-  --graph-profiling node \
-  --nvtx \
-  --nvtx-include 'gdn_forward/' \
-  --profile-from-start=off \
-  --export=profile_flashqla/profiles/flash_qla_b1_t65536_h16_sdh16_ncu \
-  .venv/bin/python profile_flashqla/scripts/profile_gdn_flash_qla.py \
-  --seq-len 65536 \
-  --strong-decay-head-ratio 1.0 \
-  --iterations 1
-
-# FLA Triton
-sudo env TMPDIR=/tmp/ncu-root /usr/local/cuda/bin/ncu \
-  --set basic \
-  --graph-profiling node \
-  --nvtx \
-  --nvtx-include 'gdn_forward/' \
-  --profile-from-start=off \
-  --export=profile_flashqla/profiles/fla_triton_b1_t65536_h16_sdh16_ncu \
-  .venv/bin/python profile_flashqla/scripts/profile_gdn_fla_triton.py \
-  --seq-len 65536 \
-  --strong-decay-head-ratio 1.0 \
-  --iterations 1
-```
