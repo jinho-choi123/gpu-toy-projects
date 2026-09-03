@@ -8,12 +8,44 @@ Nsight Compute. Correctness is verified separately in `tests/test_flashqla.py`.
 
 ## Setup
 
-Run from the repository root:
+From the repository root, enter this project before running its commands:
 
 ```bash
-uv sync
-mkdir -p profile_flashqla/profiles
+cd profile_flashqla
+uv sync --locked
+mkdir -p profiles
 ```
+
+## Qwen3.8-27B checkpoint prefill
+
+Profiles all 48 GDN layers in pinned `Qwen/Qwen3.8-27B`; choose `T=16384`,
+`32768`, or `65536`. Full-attention layers use PyTorch SDPA. Set
+`BACKEND=fla_triton` for the GDN baseline.
+
+```bash
+BACKEND=flash_qla
+SEQ_LEN=16384
+SCRIPT="scripts/profile_qwen38_27b_${BACKEND}.py"
+
+# Torch memory snapshot + one measured prefill
+uv run --locked python "$SCRIPT" --seq-len "$SEQ_LEN"
+
+# Nsight Systems
+uv run --locked nsys profile --trace=cuda,nvtx --sample=none \
+  --capture-range=cudaProfilerApi --capture-range-end=stop \
+  --output="profiles/qwen38_27b_${BACKEND}_b1_t${SEQ_LEN}_nsys" \
+  python "$SCRIPT" --seq-len "$SEQ_LEN"
+
+# Nsight Compute: per-layer GDN ranges (avoids full-model kernel replay)
+uv run --locked ncu --section SpeedOfLight --replay-mode app-range --nvtx \
+  --nvtx-include 'regex:qwen38_gdn_decoder_layer_[0-9]+_gdn_ordinal_[0-9]+/' \
+  --export="profiles/qwen38_27b_${BACKEND}_b1_t${SEQ_LEN}_ncu" \
+  python "$SCRIPT" --seq-len "$SEQ_LEN"
+```
+
+Outputs are `*.nsys-rep`, `*.ncu-rep`, and
+`qwen38_27b_${BACKEND}_b1_t${SEQ_LEN}_memory_snapshot.pickle` under
+`profiles/`. The first run downloads the checkpoint.
 
 ## Workload
 
@@ -46,41 +78,50 @@ both backends when comparing them. Run either script with `--help` for details.
 ## Direct execution
 
 ```bash
-uv run python profile_flashqla/scripts/profile_gdn_flash_qla.py
-uv run python profile_flashqla/scripts/profile_gdn_fla_triton.py
+uv run --locked python scripts/profile_gdn_flash_qla.py
+uv run --locked python scripts/profile_gdn_fla_triton.py
 ```
 
 For example, profile an even strong/weak head mix with:
 
 ```bash
-uv run python profile_flashqla/scripts/profile_gdn_flash_qla.py \
+uv run --locked python scripts/profile_gdn_flash_qla.py \
   --strong-decay-head-ratio 0.5
-uv run python profile_flashqla/scripts/profile_gdn_fla_triton.py \
+uv run --locked python scripts/profile_gdn_fla_triton.py \
   --strong-decay-head-ratio 0.5
 ```
 
 ## Full profiling sweep
 
 Run both backends with Nsight Systems and Nsight Compute for sequence lengths
-16K, 32K, and 64K and strong-decay head ratios `0.0`, `0.5`, and `1.0`:
+16K, 32K, and 64K. The synthetic GDN workload covers strong-decay head ratios
+`0.0`, `0.5`, and `1.0`; the Qwen3.8-27B workload profiles one full checkpoint
+prefill at each length:
 
 ```bash
-./profile_flashqla/scripts/sweep_profiles.sh
+uv run --locked ./scripts/sweep_profiles.sh
 ```
 
-This runs 36 profiling jobs sequentially. Nsight Systems uses 10 measured graph
-replays per job, while Nsight Compute uses one. Completed jobs (both the Nsight
-report and memory snapshot exist) are skipped, so the same command can resume an
-interrupted sweep. If a profiler finished just before an interruption, the next
-run finalizes its pending snapshot before continuing. Memory snapshots are
-preserved separately as
-`{backend}_b{B}_t{T}_h{H}_sdh{N}_{profiler}_memory_snapshot.pickle`, so the
-Nsight Systems and Nsight Compute runs do not overwrite each other.
+This runs 48 profiling jobs sequentially: 36 synthetic GDN jobs and 12
+Qwen3.8-27B jobs. Nsight Systems uses 10 measured graph replays per synthetic
+job, while Nsight Compute uses one. Each Qwen job measures one full prefill;
+Qwen Nsight Compute jobs use application-range replay over the 48 per-layer
+GDN NVTX ranges. This avoids backing up the full model allocation for every
+individual kernel. Use Nsight Systems for timing comparisons because counter
+collection perturbs durations reported by Nsight Compute.
+Completed jobs (both the Nsight report and memory snapshot exist) are skipped,
+so the same command can resume an interrupted sweep. If a profiler finished
+just before an interruption, the next run finalizes its pending snapshot before
+continuing. Memory snapshots are preserved separately as
+`{backend}_b{B}_t{T}_h{H}_sdh{N}_{profiler}_memory_snapshot.pickle` for the
+synthetic workload and
+`qwen38_27b_{backend}_b1_t{T}_{profiler}_memory_snapshot.pickle` for Qwen, so
+the Nsight Systems and Nsight Compute runs do not overwrite each other.
 
 Preview what the sweep would run without running a profiler:
 
 ```bash
-./profile_flashqla/scripts/sweep_profiles.sh --dry-run
+uv run --locked ./scripts/sweep_profiles.sh --dry-run
 ```
 
 If Nsight Compute requires elevated permissions, use `--sudo-ncu`. The script
@@ -89,7 +130,7 @@ directory. It restores ownership of the NCU report and memory snapshot to the
 calling user after each job:
 
 ```bash
-./profile_flashqla/scripts/sweep_profiles.sh --sudo-ncu
+uv run --locked ./scripts/sweep_profiles.sh --sudo-ncu
 ```
 
 Use `--force` to overwrite existing reports and snapshots. Options can be
@@ -101,7 +142,7 @@ overwritten unless `--force` is supplied.
 
 Each direct Python run records one warmed-up eager forward. Its snapshot is
 written to
-`profile_flashqla/profiles/{backend}_b{B}_t{T}_h{H}_sdh{N}_memory_snapshot.pickle`,
+`profiles/{backend}_b{B}_t{T}_h{H}_sdh{N}_memory_snapshot.pickle`,
 where `N` is the effective strong-decay head count.
 Open [PyTorch Memory Visualizer](https://pytorch.org/memory_viz), then drag and
 drop the snapshot file to inspect allocation and free events over time.
@@ -115,14 +156,14 @@ range, so it is excluded from the Nsight measurement.
 FlashQLA:
 
 ```bash
-nsys profile \
+uv run --locked nsys profile \
   --trace=cuda,nvtx \
   --sample=none \
   --cuda-graph-trace=node \
   --capture-range=cudaProfilerApi \
   --capture-range-end=stop \
-  --output=profile_flashqla/profiles/flash_qla_b1_t16384_h16_sdh16_nsys \
-  .venv/bin/python profile_flashqla/scripts/profile_gdn_flash_qla.py \
+  --output=profiles/flash_qla_b1_t16384_h16_sdh16_nsys \
+  python scripts/profile_gdn_flash_qla.py \
   --strong-decay-head-ratio 1.0 \
   --iterations 10
 ```
@@ -130,14 +171,14 @@ nsys profile \
 FLA Triton:
 
 ```bash
-nsys profile \
+uv run --locked nsys profile \
   --trace=cuda,nvtx \
   --sample=none \
   --cuda-graph-trace=node \
   --capture-range=cudaProfilerApi \
   --capture-range-end=stop \
-  --output=profile_flashqla/profiles/fla_triton_b1_t16384_h16_sdh16_nsys \
-  .venv/bin/python profile_flashqla/scripts/profile_gdn_fla_triton.py \
+  --output=profiles/fla_triton_b1_t16384_h16_sdh16_nsys \
+  python scripts/profile_gdn_fla_triton.py \
   --strong-decay-head-ratio 1.0 \
   --iterations 10
 ```
@@ -150,14 +191,14 @@ Input allocation, JIT compilation, and warmup occur before capture.
 FlashQLA:
 
 ```bash
-ncu \
+uv run --locked ncu \
   --set basic \
   --graph-profiling node \
   --nvtx \
   --nvtx-include 'gdn_forward/' \
   --profile-from-start=off \
-  --export=profile_flashqla/profiles/flash_qla_b1_t16384_h16_sdh16_ncu \
-  .venv/bin/python profile_flashqla/scripts/profile_gdn_flash_qla.py \
+  --export=profiles/flash_qla_b1_t16384_h16_sdh16_ncu \
+  python scripts/profile_gdn_flash_qla.py \
   --seq-len 16384 \
   --strong-decay-head-ratio 1.0 \
   --iterations 1
@@ -166,14 +207,14 @@ ncu \
 FLA Triton:
 
 ```bash
-ncu \
+uv run --locked ncu \
   --set basic \
   --graph-profiling node \
   --nvtx \
   --nvtx-include 'gdn_forward/' \
   --profile-from-start=off \
-  --export=profile_flashqla/profiles/fla_triton_b1_t16384_h16_sdh16_ncu \
-  .venv/bin/python profile_flashqla/scripts/profile_gdn_fla_triton.py \
+  --export=profiles/fla_triton_b1_t16384_h16_sdh16_ncu \
+  python scripts/profile_gdn_fla_triton.py \
   --seq-len 16384 \
   --strong-decay-head-ratio 1.0 \
   --iterations 1
@@ -185,27 +226,27 @@ for its lock file and run the FlashQLA profile with elevated privileges:
 ```bash
 sudo install -d -m 700 /tmp/ncu-root
 # FlashQLA
-sudo env TMPDIR=/tmp/ncu-root /usr/local/cuda/bin/ncu \
+uv run --locked sudo env TMPDIR=/tmp/ncu-root /usr/local/cuda/bin/ncu \
   --set basic \
   --graph-profiling node \
   --nvtx \
   --nvtx-include 'gdn_forward/' \
   --profile-from-start=off \
-  --export=profile_flashqla/profiles/flash_qla_b1_t16384_h16_sdh16_ncu \
-  .venv/bin/python profile_flashqla/scripts/profile_gdn_flash_qla.py \
+  --export=profiles/flash_qla_b1_t16384_h16_sdh16_ncu \
+  .venv/bin/python scripts/profile_gdn_flash_qla.py \
   --seq-len 16384 \
   --strong-decay-head-ratio 1.0 \
   --iterations 1
 
 # FLA Triton
-sudo env TMPDIR=/tmp/ncu-root /usr/local/cuda/bin/ncu \
+uv run --locked sudo env TMPDIR=/tmp/ncu-root /usr/local/cuda/bin/ncu \
   --set basic \
   --graph-profiling node \
   --nvtx \
   --nvtx-include 'gdn_forward/' \
   --profile-from-start=off \
-  --export=profile_flashqla/profiles/fla_triton_b1_t16384_h16_sdh16_ncu \
-  .venv/bin/python profile_flashqla/scripts/profile_gdn_fla_triton.py \
+  --export=profiles/fla_triton_b1_t16384_h16_sdh16_ncu \
+  .venv/bin/python scripts/profile_gdn_fla_triton.py \
   --seq-len 16384 \
   --strong-decay-head-ratio 1.0 \
   --iterations 1

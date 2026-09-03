@@ -4,9 +4,8 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "${script_dir}/.." && pwd)"
-repo_root="$(cd -- "${project_dir}/.." && pwd)"
 
-python_bin="${repo_root}/.venv/bin/python"
+python_bin="${VIRTUAL_ENV:-${project_dir}/.venv}/bin/python"
 profiles_dir="${project_dir}/profiles"
 ncu_root_tmpdir="/tmp/ncu-root"
 ncu_sudo_bin="/usr/local/cuda/bin/ncu"
@@ -34,8 +33,8 @@ usage() {
     cat <<'EOF'
 Usage: sweep_profiles.sh [OPTIONS]
 
-Run the FlashQLA and FLA Triton Nsight Systems/Compute sweep for sequence
-lengths 16K, 32K, and 64K and strong-decay head ratios 0.0, 0.5, and 1.0.
+Run the FlashQLA and FLA Triton Nsight Systems/Compute sweep for the synthetic
+GDN workload and Qwen3.8-27B checkpoint prefill at 16K, 32K, and 64K.
 
 Options:
   --dry-run    Print commands without running them.
@@ -105,38 +104,69 @@ finalize_snapshot() {
 
 run_profile() {
     local profiler="$1"
-    local backend="$2"
-    local entrypoint="$3"
-    local seq_len="$4"
-    local ratio="$5"
-    local strong_decay_heads="$6"
+    local workload="$2"
+    local backend="$3"
+    local entrypoint="$4"
+    local seq_len="$5"
+    local ratio="${6:-}"
+    local strong_decay_heads="${7:-}"
     local artifact_prefix
+    local job_description
+    local iterations
     local output_base
     local report_path
     local snapshot_source
     local snapshot_target
     local -a cmd
+    local -a profile_args
 
-    artifact_prefix="${profiles_dir}/${backend}_b${batch_size}_t${seq_len}_h${num_heads}_sdh${strong_decay_heads}"
+    case "${workload}" in
+        gdn)
+            artifact_prefix="${profiles_dir}/${backend}_b${batch_size}_t${seq_len}_h${num_heads}_sdh${strong_decay_heads}"
+            job_description="${backend} | T=${seq_len} | strong-decay=${ratio} (${strong_decay_heads}/${num_heads} heads)"
+            ;;
+        qwen38_27b)
+            artifact_prefix="${profiles_dir}/qwen38_27b_${backend}_b1_t${seq_len}"
+            job_description="Qwen3.8-27B ${backend} | T=${seq_len}"
+            ;;
+        *)
+            fail "unknown workload: ${workload}"
+            ;;
+    esac
+
     output_base="${artifact_prefix}_${profiler}"
     snapshot_source="${artifact_prefix}_memory_snapshot.pickle"
     snapshot_target="${artifact_prefix}_${profiler}_memory_snapshot.pickle"
     case "${profiler}" in
         nsys)
             report_path="${output_base}.nsys-rep"
+            iterations="${nsys_iterations}"
             ;;
         ncu)
             report_path="${output_base}.ncu-rep"
+            iterations="${ncu_iterations}"
             ;;
         *)
             fail "unknown profiler: ${profiler}"
             ;;
     esac
 
+    if [[ "${workload}" == gdn ]]; then
+        profile_args=(
+            --batch-size "${batch_size}"
+            --seq-len "${seq_len}"
+            --num-heads "${num_heads}"
+            --strong-decay-head-ratio "${ratio}"
+            --seed "${seed}"
+            --iterations "${iterations}"
+        )
+    else
+        profile_args=(--seq-len "${seq_len}")
+    fi
+
     current_job=$((current_job + 1))
-    printf '[%02d/%d] %s | T=%s | strong-decay=%s (%s/%s heads) | %s\n' \
-        "${current_job}" "${total_jobs}" "${backend}" "${seq_len}" "${ratio}" \
-        "${strong_decay_heads}" "${num_heads}" "${profiler}"
+    printf '[%02d/%d] %s | %s\n' \
+        "${current_job}" "${total_jobs}" "${job_description}" "${profiler}"
 
     if ((force == 0)); then
         if report_exists "${profiler}" "${output_base}"; then
@@ -170,7 +200,11 @@ run_profile() {
                 nsys profile
                 --trace=cuda,nvtx
                 --sample=none
-                --cuda-graph-trace=node
+            )
+            if [[ "${workload}" == gdn ]]; then
+                cmd+=(--cuda-graph-trace=node)
+            fi
+            cmd+=(
                 --capture-range=cudaProfilerApi
                 --capture-range-end=stop
             )
@@ -181,12 +215,7 @@ run_profile() {
                 "--output=${output_base}"
                 "${python_bin}"
                 "${entrypoint}"
-                --batch-size "${batch_size}"
-                --seq-len "${seq_len}"
-                --num-heads "${num_heads}"
-                --strong-decay-head-ratio "${ratio}"
-                --seed "${seed}"
-                --iterations "${nsys_iterations}"
+                "${profile_args[@]}"
             )
             ;;
         ncu)
@@ -196,13 +225,22 @@ run_profile() {
             else
                 cmd=(ncu)
             fi
-            cmd+=(
-                --set basic
-                --graph-profiling node
-                --nvtx
-                --nvtx-include 'gdn_forward/'
-                --profile-from-start=off
-            )
+            if [[ "${workload}" == gdn ]]; then
+                cmd+=(
+                    --set basic
+                    --graph-profiling node
+                    --nvtx
+                    --nvtx-include 'gdn_forward/'
+                    --profile-from-start=off
+                )
+            else
+                cmd+=(
+                    --section SpeedOfLight
+                    --replay-mode app-range
+                    --nvtx
+                    --nvtx-include 'regex:qwen38_gdn_decoder_layer_[0-9]+_gdn_ordinal_[0-9]+/'
+                )
+            fi
             if ((force == 1)); then
                 cmd+=(--force-overwrite)
             fi
@@ -210,12 +248,7 @@ run_profile() {
                 "--export=${output_base}"
                 "${python_bin}"
                 "${entrypoint}"
-                --batch-size "${batch_size}"
-                --seq-len "${seq_len}"
-                --num-heads "${num_heads}"
-                --strong-decay-head-ratio "${ratio}"
-                --seed "${seed}"
-                --iterations "${ncu_iterations}"
+                "${profile_args[@]}"
             )
             ;;
     esac
@@ -254,10 +287,13 @@ while (($# > 0)); do
     shift
 done
 
-total_jobs=$((${#profilers[@]} * ${#backends[@]} * ${#sequence_lengths[@]} * ${#strong_decay_ratios[@]}))
+gdn_jobs=$((${#profilers[@]} * ${#backends[@]} * ${#sequence_lengths[@]} * ${#strong_decay_ratios[@]}))
+qwen_jobs=$((${#profilers[@]} * ${#backends[@]} * ${#sequence_lengths[@]}))
+total_jobs=$((gdn_jobs + qwen_jobs))
 
 if ((dry_run == 0)); then
-    [[ -x "${python_bin}" ]] || fail "Python environment not found: ${python_bin}; run 'uv sync' first"
+    [[ -x "${python_bin}" ]] || fail \
+        "Python environment not found: ${python_bin}; run 'uv run --locked ./scripts/sweep_profiles.sh' from ${project_dir}"
     require_command nsys
     if ((sudo_ncu == 1)); then
         require_command sudo
@@ -268,7 +304,8 @@ if ((dry_run == 0)); then
     mkdir -p "${profiles_dir}"
 fi
 
-printf 'Profiling sweep: %d jobs (2 backends x 3 sequence lengths x 3 ratios x 2 profilers)\n' "${total_jobs}"
+printf 'Profiling sweep: %d jobs (%d GDN + %d Qwen3.8-27B)\n' \
+    "${total_jobs}" "${gdn_jobs}" "${qwen_jobs}"
 if ((dry_run == 1)); then
     printf 'Dry-run mode: no commands will be executed.\n'
 fi
@@ -277,10 +314,12 @@ for profiler in "${profilers[@]}"; do
     for backend in "${backends[@]}"; do
         case "${backend}" in
             flash_qla)
-                entrypoint="${script_dir}/profile_gdn_flash_qla.py"
+                gdn_entrypoint="${script_dir}/profile_gdn_flash_qla.py"
+                qwen_entrypoint="${script_dir}/profile_qwen38_27b_flash_qla.py"
                 ;;
             fla_triton)
-                entrypoint="${script_dir}/profile_gdn_fla_triton.py"
+                gdn_entrypoint="${script_dir}/profile_gdn_fla_triton.py"
+                qwen_entrypoint="${script_dir}/profile_qwen38_27b_fla_triton.py"
                 ;;
         esac
 
@@ -288,12 +327,19 @@ for profiler in "${profilers[@]}"; do
             for ratio_index in "${!strong_decay_ratios[@]}"; do
                 run_profile \
                     "${profiler}" \
+                    gdn \
                     "${backend}" \
-                    "${entrypoint}" \
+                    "${gdn_entrypoint}" \
                     "${seq_len}" \
                     "${strong_decay_ratios[${ratio_index}]}" \
                     "${strong_decay_head_counts[${ratio_index}]}"
             done
+            run_profile \
+                "${profiler}" \
+                qwen38_27b \
+                "${backend}" \
+                "${qwen_entrypoint}" \
+                "${seq_len}"
         done
     done
 done

@@ -47,28 +47,13 @@ Run all commands below from the project directory. From the repository root:
 
 ```bash
 cd flash_attention_1_triton
+uv sync --locked
 ```
 
-## Run Tests
-
-Run the tests with:
+## Development checks
 
 ```bash
-uv run pytest tests/
-```
-
-## Run the Benchmark
-
-Run the benchmark with:
-
-```bash
-uv run pytest benchmark/benchmark.py
-```
-
-## Run the Profiler
-
-Run the profiler with:
-
-```bash
-uv run pytest profile/profile.py
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked ty check
 ```

@@ -7,6 +7,7 @@ import torch
 import torch.nn.functional as F
 from fla.ops.gated_delta_rule.backends.flash_qla import FlashQLABackend
 from fla.utils import assert_close
+
 from profile_flashqla.utils import GdnInput, run_forward
 
 _FLASH_QLA_ERROR_RATIO = 0.008
