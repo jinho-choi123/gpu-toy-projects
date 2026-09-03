@@ -38,6 +38,7 @@ class ProfileConfig:
     batch_size: int
     seq_len: int
     num_heads: int
+    strong_decay_head_ratio: float
     seed: int
     iterations: int
 
@@ -49,10 +50,22 @@ def _parse_args(argv: Sequence[str] | None) -> ProfileConfig:
             raise argparse.ArgumentTypeError("value must be positive")
         return value
 
+    def _unit_interval_float(raw: str) -> float:
+        value = float(raw)
+        if not 0.0 <= value <= 1.0:
+            raise argparse.ArgumentTypeError("value must be between 0.0 and 1.0")
+        return value
+
     parser = argparse.ArgumentParser(description="Profile a GDN forward implementation.")
     _ = parser.add_argument("--batch-size", type=_positive_int, default=1)
     _ = parser.add_argument("--seq-len", type=_positive_int, default=16_384)
     _ = parser.add_argument("--num-heads", type=_positive_int, default=16)
+    _ = parser.add_argument(
+        "--strong-decay-head-ratio",
+        type=_unit_interval_float,
+        default=1.0,
+        help="Fraction of heads using logsigmoid gates. Remaining heads use gate 0.",
+    )
     _ = parser.add_argument("--seed", type=int, default=42)
     _ = parser.add_argument("--iterations", type=_positive_int, default=1)
     args = parser.parse_args(argv)
@@ -61,6 +74,7 @@ def _parse_args(argv: Sequence[str] | None) -> ProfileConfig:
         batch_size=args.batch_size,
         seq_len=args.seq_len,
         num_heads=args.num_heads,
+        strong_decay_head_ratio=args.strong_decay_head_ratio,
         seed=args.seed,
         iterations=args.iterations,
     )
@@ -71,6 +85,52 @@ def _to_mib(num_bytes: int) -> float:
     return num_bytes / BYTES_PER_MIB
 
 
+def _strong_decay_head_count(
+    num_heads: int,
+    strong_decay_ratio: float,
+) -> int:
+    """Convert a ratio to the nearest whole head, rounding ties upward."""
+    return int(num_heads * strong_decay_ratio + 0.5)
+
+
+def _generate_gate(
+    gate_shape: tuple[int, int, int],
+    *,
+    strong_decay_head_count: int,
+    device: torch.device,
+) -> torch.Tensor:
+    """Create gates with a fixed contiguous set of strong-decay heads."""
+    gate = F.logsigmoid(
+        torch.randn(
+            *gate_shape,
+            device=device,
+            dtype=torch.float32,
+        )
+    )
+
+    # Generate every random gate first so changing the ratio does not
+    # change RNG consumption for beta or initial_state.
+    gate[..., strong_decay_head_count:] = 0.0
+    return gate
+
+
+def _memory_snapshot_path(
+    backend: ProfileBackend,
+    config: ProfileConfig,
+) -> Path:
+    """Build a snapshot path that identifies the effective gate mix."""
+    strong_decay_head_count = _strong_decay_head_count(
+        config.num_heads,
+        config.strong_decay_head_ratio,
+    )
+
+    return PROFILES_DIR / (
+        f"{backend.value}_b{config.batch_size}_t{config.seq_len}"
+        f"_h{config.num_heads}_sdh{strong_decay_head_count}"
+        "_memory_snapshot.pickle"
+    )
+
+
 def _profile_eager_forward_memory(
     backend: ProfileBackend,
     config: ProfileConfig,
@@ -79,10 +139,7 @@ def _profile_eager_forward_memory(
 ) -> None:
     """Capture memory history for one warmed-up eager GDN forward."""
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
-    snapshot_path = PROFILES_DIR / (
-        f"{backend.value}_b{config.batch_size}_t{config.seq_len}"
-        f"_h{config.num_heads}_memory_snapshot.pickle"
-    )
+    snapshot_path = _memory_snapshot_path(backend, config)
 
     # Complete all warmup work and remove unused allocator cache so that the
     # baseline consists of live inputs and persistent runtime allocations.
@@ -159,6 +216,11 @@ def main(backend: ProfileBackend, argv: Sequence[str] | None = None) -> int:
     # parse the configuration from the command line
     config = _parse_args(argv)
 
+    strong_decay_head_count = _strong_decay_head_count(
+        config.num_heads,
+        config.strong_decay_head_ratio,
+    )
+
     # VERIFICATION
 
     # set the FLA_FLASH_QLA env var
@@ -189,6 +251,8 @@ def main(backend: ProfileBackend, argv: Sequence[str] | None = None) -> int:
         "batch_size": config.batch_size,
         "seq_len": config.seq_len,
         "num_heads": config.num_heads,
+        "strong_decay_head_ratio": config.strong_decay_head_ratio,
+        "num_strong_decay_heads": strong_decay_head_count,
         "head_dim": HEAD_DIM,
         "value_head_dim": HEAD_DIM,
         "dtype": str(DTYPE).removeprefix("torch."),
@@ -220,7 +284,11 @@ def main(backend: ProfileBackend, argv: Sequence[str] | None = None) -> int:
     k = torch.randn_like(q)
     v = torch.randn_like(q)
 
-    g = F.logsigmoid(torch.randn(*gate_shape, device=device, dtype=torch.float32))
+    g = _generate_gate(
+        gate_shape,
+        strong_decay_head_count=strong_decay_head_count,
+        device=device,
+    )
     beta = torch.randn(
         *gate_shape,
         device=device,
