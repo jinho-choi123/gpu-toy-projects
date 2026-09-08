@@ -18,29 +18,6 @@ repos:
 
     - repo: local
       hooks:
-          - id: profile-flashqla-ruff-check
-            name: profile_flashqla ruff check
-            entry: uv run --project profile_flashqla --locked ruff check --fix --force-exclude
-            language: system
-            files: ^profile_flashqla/
-            types_or: [python, pyi]
-            require_serial: true
-
-          - id: profile-flashqla-ruff-format
-            name: profile_flashqla ruff format
-            entry: uv run --project profile_flashqla --locked ruff format --force-exclude
-            language: system
-            files: ^profile_flashqla/
-            types_or: [python, pyi]
-            require_serial: true
-
-          - id: profile-flashqla-ty-check
-            name: profile_flashqla ty check
-            entry: uv run --project profile_flashqla --locked ty check --project profile_flashqla
-            language: system
-            files: ^profile_flashqla/
-            pass_filenames: false
-
           - id: flash-attention-1-triton-ruff-check
             name: flash_attention_1_triton ruff check
             entry: uv run --project flash_attention_1_triton --locked ruff check --fix --force-exclude
