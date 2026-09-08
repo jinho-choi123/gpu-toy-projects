@@ -49,16 +49,8 @@ cd flash_attention_1_triton
 uv sync --locked
 ```
 
-Or set up FlashQLA profiling:
-
-```bash
-cd profile_flashqla
-uv sync --locked
-```
-
 Continue from that project directory and follow its README:
-[FlashAttention 1](flash_attention_1_triton/README.md) or
-[FlashQLA profiling](profile_flashqla/README.md).
+[FlashAttention 1](flash_attention_1_triton/README.md).
 
 ## Troubleshooting
 

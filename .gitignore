@@ -1,6 +1,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,cuda
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,cuda
-.agents/
+.agents/*
+!.agents/skills/
 .agent/
 .claude/
 agent/

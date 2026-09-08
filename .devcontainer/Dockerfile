@@ -88,9 +88,6 @@ RUN curl -fsSL https://bun.com/install | bash
 
 RUN curl -fsSL https://chatgpt.com/codex/install.sh | sh
 
-# Install pnpm for understand-anything skill.
-RUN npm install --global --prefix /home/${USERNAME}/.local pnpm
-
 WORKDIR /workspace
 
 CMD ["zsh"]
