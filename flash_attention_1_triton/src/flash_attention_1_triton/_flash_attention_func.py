@@ -30,16 +30,17 @@ def flash_attention_func(
     """Compute fixed-length FlashAttention 1.
 
     Args:
-        q: Query tensor shaped ``[batch, query_length, heads, head_dim]``.
-        k: Key tensor shaped ``[batch, key_length, heads, head_dim]``.
-        v: Value tensor with the same shape as ``k``.
-        causal: Whether to apply a bottom-right-aligned causal mask. When ``True``,
+        q (Tensor): Query tensor shaped ``[batch, query_length, heads, head_dim]``.
+        k (Tensor): Key tensor shaped ``[batch, key_length, heads, head_dim]``.
+        v (Tensor): Value tensor with the same shape as ``k``.
+        causal (bool): Whether to apply a bottom-right-aligned causal mask. When ``True``,
             ``query_length`` must not exceed ``key_length``.
-        softmax_scale: Positive finite scale applied before softmax. Defaults to
+        softmax_scale (float | None): Positive finite scale applied before softmax. Defaults to
             ``1 / sqrt(head_dim)``.
 
     Returns:
-        A contiguous tensor shaped like ``q`` and with the same dtype and device.
+        Tensor: Contiguous attention output shaped like ``q``, with the same dtype
+            and device as ``q``.
 
     Raises:
         ValueError: If ``causal=True`` and ``query_length > key_length``.

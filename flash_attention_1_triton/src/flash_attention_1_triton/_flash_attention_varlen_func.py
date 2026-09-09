@@ -32,21 +32,22 @@ def flash_attention_varlen_func(
     """Compute variable-length FlashAttention 1 over packed sequences.
 
     Args:
-        q: Packed query tensor shaped ``[total_queries, heads, head_dim]``.
-        k: Packed key tensor shaped ``[total_keys, heads, head_dim]``.
-        v: Packed value tensor with the same shape as ``k``.
-        cu_seqlens_q: CUDA int32 cumulative query lengths shaped ``[batch + 1]``.
-        cu_seqlens_k: CUDA int32 cumulative key lengths shaped ``[batch + 1]``.
-        max_seqlen_q: Exact maximum query length in the batch.
-        max_seqlen_k: Exact maximum key length in the batch.
-        causal: Whether to apply a bottom-right-aligned causal mask. When ``True``,
+        q (Tensor): Packed query tensor shaped ``[total_queries, heads, head_dim]``.
+        k (Tensor): Packed key tensor shaped ``[total_keys, heads, head_dim]``.
+        v (Tensor): Packed value tensor with the same shape as ``k``.
+        cu_seqlens_q (Tensor): CUDA int32 cumulative query lengths shaped ``[batch + 1]``.
+        cu_seqlens_k (Tensor): CUDA int32 cumulative key lengths shaped ``[batch + 1]``.
+        max_seqlen_q (int): Exact maximum query length in the batch.
+        max_seqlen_k (int): Exact maximum key length in the batch.
+        causal (bool): Whether to apply a bottom-right-aligned causal mask. When ``True``,
             each query sequence must not be longer than its corresponding key
             sequence.
-        softmax_scale: Positive finite scale applied before softmax. Defaults to
+        softmax_scale (float | None): Positive finite scale applied before softmax. Defaults to
             ``1 / sqrt(head_dim)``.
 
     Returns:
-        A contiguous tensor shaped like ``q`` and with the same dtype and device.
+        Tensor: Contiguous attention output shaped like ``q``, with the same dtype
+            and device as ``q``.
 
     Raises:
         ValueError: If ``causal=True`` and any query sequence is longer than its
