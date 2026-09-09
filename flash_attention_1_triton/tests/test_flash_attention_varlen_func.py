@@ -54,19 +54,21 @@ def test_output_and_gradients(
         dtype,
         strided=strided,
     )
-    logger.info("Preparing independent FP32 reference inputs")
-    reference_inputs = tuple(x.detach().float().requires_grad_() for x in inputs)
-    expected = attention_varlen(
-        *reference_inputs,
-        q_lengths=q_lengths,
-        k_lengths=k_lengths,
-        causal=causal,
-        softmax_scale=scale,
-    )
-    logger.info("Reference outputs concatenated; building CUDA cumulative lengths")
+    logger.info("Preparing independent Flash Attention reference inputs")
+    reference_inputs = tuple(x.detach().requires_grad_() for x in inputs)
+    logger.info("Building CUDA cumulative lengths")
     cu_q, cu_k = (
         torch.tensor([0, *lengths], device="cuda", dtype=torch.int32).cumsum(0, dtype=torch.int32)
         for lengths in (q_lengths, k_lengths)
+    )
+    expected = attention_varlen(
+        *reference_inputs,
+        cu_seqlens_q=cu_q,
+        cu_seqlens_k=cu_k,
+        max_seqlen_q=max(q_lengths),
+        max_seqlen_k=max(k_lengths),
+        causal=causal,
+        softmax_scale=scale,
     )
     logger.info("Calling flash_attention_varlen_func")
     output = flash_attention_varlen_func(
