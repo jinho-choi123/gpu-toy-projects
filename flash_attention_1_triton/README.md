@@ -123,3 +123,36 @@ Args section), `DOC201` (missing Returns), and `DOC402` (missing Yields). The DO
 rules require preview mode; only explicitly selected preview rules are enabled.
 Ruff does not require an Args section when it is absent, and exempts None-only
 returns/yields and stubs from the corresponding DOC rules.
+
+## Fixed-length benchmark
+
+Compare `flash_attention_func` with CUDA SDPA forced to `SDPBackend.MATH`, which
+materializes the attention matrix. Run one shape/dtype combination per invocation:
+
+```bash
+uv run --locked python -m flash_attention_1_triton.benchmark \
+  --batch-size 2 --query-length 1024 --key-length 1024 \
+  --heads 8 --head-dim 64 --dtype float16 --mode forward --cuda-graph
+```
+
+- `--mode forward` measures inference forward without autograd; `backward` measures
+  Q/K/V gradients using a retained, precomputed forward graph; `both` measures a fresh
+  forward and its backward together. Gradients do not accumulate between iterations.
+- Omit `--cuda-graph` for ordinary execution; include it to capture one operation and
+  time replays. Both implementations use the same setting.
+- Dtypes: `float16` / `bfloat16`; head dimensions: `32` / `64` / `128`.
+  `--key-length` defaults to `--query-length`. Attention is non-causal, with no dropout
+  and the default `1 / sqrt(head_dim)` scale.
+- `--warmup` (default 25) and `--iterations` (default 100) control repetition counts.
+  Results report median CUDA-event milliseconds and `MATH / Triton` speedup.
+  Input creation, correctness checks, compilation/warmup, and graph capture are excluded.
+  Ordinary execution can include GPU idle gaps from host dispatch; graph mode reduces
+  that overhead. No cache flush is performed between samples.
+- SDPA MATH retains FP32 intermediates for FP16/BF16 inputs. The comparison measures
+  these implementations as provided, including their precision differences and API
+  layout views; it does not isolate materialization as the only source of speedup.
+- Outputs and, for training modes, gradients are checked before timing. While the
+  Triton API raises `NotImplementedError`, only MATH latency is reported and speedup
+  is explicitly unavailable. Other errors are not suppressed.
+
+Select the GPU with `CUDA_VISIBLE_DEVICES=<index>`. Varlen benchmarking is excluded.
