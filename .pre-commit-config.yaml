@@ -40,3 +40,11 @@ repos:
             language: system
             files: ^flash_attention_1_triton/
             pass_filenames: false
+
+          - id: flash-attention-1-triton-tensor-annotations
+            name: flash_attention_1_triton Tensor annotations
+            entry: uv run --project flash_attention_1_triton --locked pytest flash_attention_1_triton/tests/test_annotations.py -q --capture=fd
+            language: system
+            files: ^flash_attention_1_triton/
+            types_or: [python, pyi]
+            pass_filenames: false
