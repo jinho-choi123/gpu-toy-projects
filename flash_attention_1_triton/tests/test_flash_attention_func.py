@@ -35,7 +35,7 @@ def test_output_and_gradients(
     scale: float | None,
     strided: bool,
 ) -> None:
-    """Match FP32 attention including scale, causal alignment, and strided inputs.
+    """Match PyTorch Flash Attention including scale, causal alignment, and strided inputs.
 
     Args:
         dtype (torch.dtype): Input dtype, torch.float16 or torch.bfloat16.
@@ -49,15 +49,15 @@ def test_output_and_gradients(
         strided (bool): Test inputs with gaps between rows.
 
     Returns:
-        None: Complete if the output and Q/K/V gradients match the FP32 reference.
+        None: Complete if the output and Q/K/V gradients match the Flash Attention reference.
     """
     inputs = make_inputs(
         [(batch, length, heads, head_dim) for length in (q_len, k_len, k_len)],
         dtype,
         strided=strided,
     )
-    logger.info("Preparing independent FP32 reference inputs")
-    reference_inputs = tuple(x.detach().float().requires_grad_() for x in inputs)
+    logger.info("Preparing independent Flash Attention reference inputs")
+    reference_inputs = tuple(x.detach().requires_grad_() for x in inputs)
     expected = attention(*reference_inputs, causal=causal, softmax_scale=scale)
     logger.info("Calling flash_attention_func")
     output = flash_attention_func(*inputs, causal=causal, softmax_scale=scale)

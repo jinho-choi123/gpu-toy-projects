@@ -46,9 +46,6 @@ def dtype(request: pytest.FixtureRequest, cuda: None) -> torch.dtype:
         cuda (None): Completed CUDA availability fixture.
 
     Returns:
-        torch.dtype: torch.float16 or torch.bfloat16; unsupported BF16 cases are skipped.
+        torch.dtype: torch.float16 or torch.bfloat16; unsupported CUDA execution fails.
     """
-    if request.param == torch.bfloat16 and not torch.cuda.is_bf16_supported():
-        logger.warning("Skipping BF16 test: GPU does not support BF16")
-        pytest.skip("BF16 is not supported by this GPU")
     return request.param
