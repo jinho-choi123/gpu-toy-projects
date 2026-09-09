@@ -1,4 +1,4 @@
-# ruff: noqa: F722, T201
+# ruff: noqa: F722
 """Benchmark fixed-length FlashAttention against materialized SDPA MATH on CUDA."""
 
 import argparse
@@ -8,6 +8,7 @@ from statistics import median
 import torch
 import torch.nn.functional as F
 from jaxtyping import BFloat16, Float16, Float32
+from loguru import logger
 from torch import Tensor
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
@@ -127,7 +128,7 @@ def positive_int(value: str) -> int:
 
 
 def main() -> None:
-    """Parse one benchmark case, check agreement, and print latencies and speedup."""
+    """Parse one benchmark case, check agreement, and log latencies and speedup."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--batch-size", type=positive_int, default=1)
     parser.add_argument("--query-length", type=positive_int, default=1024)
@@ -163,19 +164,23 @@ def main() -> None:
     )
     inputs = (q, k, v)
     grad = torch.randn_like(q)
-    print(f"GPU: {torch.cuda.get_device_name()} | torch: {torch.__version__}")
-    print(
-        f"Q={tuple(q.shape)} K/V={tuple(k.shape)} dtype={args.dtype} "
-        f"mode={args.mode} cuda_graph={args.cuda_graph}"
+    logger.info("GPU: {} | torch: {}", torch.cuda.get_device_name(), torch.__version__)
+    logger.info(
+        "Q={} K/V={} dtype={} mode={} cuda_graph={}",
+        tuple(q.shape),
+        tuple(k.shape),
+        args.dtype,
+        args.mode,
+        args.cuda_graph,
     )
-    print("Non-causal; default scale; SDPA MATH uses FP32 intermediates.")
+    logger.info("Non-causal; default scale; SDPA MATH uses FP32 intermediates.")
     reference_step = make_step(lambda: math_attention(q, k, v), inputs, grad, args.mode)
     triton_available = False
     try:
         candidate_step = make_step(lambda: flash_attention_func(q, k, v), inputs, grad, args.mode)
         actual = candidate_step()
     except NotImplementedError as error:
-        print(f"Triton: unavailable ({error}); speedup unavailable")
+        logger.warning("Triton: unavailable ({}); speedup unavailable", error)
     else:
         atol, rtol = (1e-3, 1e-2) if args.dtype == "float16" else (1e-2, 5e-2)
         torch.testing.assert_close(actual, reference_step(), atol=atol, rtol=rtol)
@@ -187,7 +192,7 @@ def main() -> None:
                 )
         del actual
         triton_available = True
-        print("Correctness: passed")
+        logger.info("Correctness: passed")
     del reference_step
     if triton_available:
         del candidate_step
@@ -197,7 +202,7 @@ def main() -> None:
         args.warmup,
         args.iterations,
     )
-    print(f"SDPA MATH: {math_ms:.6f} ms (median, {args.iterations} samples)")
+    logger.info("SDPA MATH: {:.6f} ms (median, {} samples)", math_ms, args.iterations)
     if triton_available:
         triton_ms = measure(
             lambda: make_step(lambda: flash_attention_func(q, k, v), inputs, grad, args.mode),
@@ -205,8 +210,8 @@ def main() -> None:
             args.warmup,
             args.iterations,
         )
-        print(f"Triton:    {triton_ms:.6f} ms")
-        print(f"Speedup (MATH / Triton): {math_ms / triton_ms:.3f}x")
+        logger.info("Triton:    {:.6f} ms", triton_ms)
+        logger.info("Speedup (MATH / Triton): {:.3f}x", math_ms / triton_ms)
 
 
 if __name__ == "__main__":
