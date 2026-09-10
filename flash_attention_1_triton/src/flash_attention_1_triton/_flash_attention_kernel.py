@@ -1,10 +1,7 @@
-"""FlashAttention 1 Algorithm 1 forward kernel exercise."""
+"""FlashAttention 1 Algorithm 1 forward kernel."""
 
 import triton
 import triton.language as tl
-
-# Set to True only after implementing every kernel TODO below.
-FORWARD_IMPLEMENTED = False
 
 
 @triton.jit
@@ -51,14 +48,14 @@ def _flash_attention_forward(
         CAUSAL (tl.constexpr): Whether to apply bottom-right causal masking.
 
     Returns:
-        None: Once implemented, write normalized attention to O and final statistics to M/L.
+        None: Write normalized attention to O and final statistics to M/L.
 
     Note:
         Grid axis 0 selects the batch and axis 1 selects the head. Each program
         owns all query rows of that pair. O/M/L remain in HBM across tile updates.
         The launcher converts the final FP32 O to the input dtype.
     """
-    # TODO: Identify this program's batch/head and construct tile offsets and bounds masks.
+    # Identify this program's batch/head and construct tile offsets and bounds masks.
     batch_idx = tl.program_id(0)
     head_idx = tl.program_id(1)
 
@@ -66,7 +63,7 @@ def _flash_attention_forward(
     q_block_offsets = tl.arange(0, BLOCK_Q)
     head_dim_offsets = tl.arange(0, HEAD_DIM)
 
-    # TODO: Traverse K/V tiles in the outer loop and load the current K/V tile.
+    # Traverse K/V tiles in the outer loop and load the current K/V tile.
     for k_block_start_offset in range(0, KEY_LENGTH, BLOCK_K):
         k_tile = tl.load(
             K_ptr
@@ -88,7 +85,7 @@ def _flash_attention_forward(
             other=0.0,
         )
 
-        # TODO: Traverse Q tiles in the inner loop and load Q plus the current O/M/L state.
+        # Traverse Q tiles in the inner loop and load Q plus the current O/M/L state.
         for q_block_start_offset in range(0, QUERY_LENGTH, BLOCK_Q):
             last_q_idx = tl.minimum(q_block_start_offset + BLOCK_Q, QUERY_LENGTH) - 1
             if QUERY_LENGTH - last_q_idx > KEY_LENGTH - k_block_start_offset and CAUSAL:

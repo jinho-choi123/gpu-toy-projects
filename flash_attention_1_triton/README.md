@@ -35,19 +35,17 @@ varlen_output = flash_attention_varlen_func(
 )
 ```
 
-The fixed-length API has a complete forward launcher and an unfinished Triton kernel.
-Valid inference calls raise `NotImplementedError` until the kernel is implemented. Calls
-that require autograd raise a backward-not-implemented error. The variable-length API
+The fixed-length API implements forward attention with a Triton kernel. Calls that
+require autograd raise a backward-not-implemented error. The variable-length API
 is still an unimplemented stub.
 
 Earlier API drafts exported `flash_attention` and `flash_attention_varlen`. These names were
 replaced by `flash_attention_func` and `flash_attention_varlen_func`, respectively.
 
-## Forward kernel exercise
+## Forward kernel
 
-Implement the TODOs in `src/flash_attention_1_triton/_flash_attention_kernel.py`.
-The kernel body contains no loops, indexing, loads, stores, or attention calculations.
-It follows the intended structure of the paper's Algorithm 1: an outer K/V tile loop
+`src/flash_attention_1_triton/_flash_attention_kernel.py` implements the paper's
+Algorithm 1: an outer K/V tile loop
 and an inner Q tile loop, with one Triton program per `(batch, head)` pair.
 
 `_flash_attention_func.py` supplies input validation, a `(batch, heads)` launch grid,
@@ -62,20 +60,17 @@ Each program owns every query row of its batch/head pair. Write the final normal
 output to `O_ptr`; the launcher converts it to the input dtype. This initial launch
 configuration prioritizes following the paper; small batch/head counts limit parallelism.
 
-After filling every kernel TODO, set `FORWARD_IMPLEMENTED = True` in the kernel module.
-The guard prevents the empty kernel from silently returning a meaningless result.
 For tensors with `requires_grad=True`, call the API inside `torch.no_grad()` to run
 forward. Backward remains a separate implementation task.
 
-Run the scaffold checks before implementing the kernel:
+Run forward correctness, launcher validation, and annotation checks:
 
 ```bash
-uv run --locked pytest tests/test_forward_scaffold.py tests/test_annotations.py -q --capture=fd
+uv run --locked pytest tests/test_flash_attention_func.py tests/test_forward_scaffold.py tests/test_annotations.py -k "not test_output_and_gradients" -q --capture=fd
 ```
 
-The scaffold tests expect the unfinished-kernel guard; replace those expectations with
-forward correctness checks when implementing the kernel. Full output/gradient tests
-remain the acceptance criteria for the eventual complete implementation.
+Forward-only and combined output/gradient tests reuse the same input cases.
+The combined tests remain the acceptance criteria for backward implementation.
 
 ## Working Directory
 
@@ -110,10 +105,9 @@ API tests require CUDA and skip when it is unavailable; BF16 cases also skip on
 unsupported GPUs. The reference checks run on CPU. To select a GPU, prefix the
 command with `CUDA_VISIBLE_DEVICES=<index>`.
 
-Attention calculations and backward are currently unimplemented, so output/gradient
-tests intentionally fail with `NotImplementedError`. These failures define the complete
-implementation acceptance criteria; they are not marked as expected failures. The
-forward scaffold checks and fixed-length causal input rejection test can pass now.
+Backward and variable-length attention are currently unimplemented, so their
+acceptance tests intentionally fail with `NotImplementedError`; they are not marked
+as expected failures. Fixed-length forward and launcher validation tests can pass now.
 
 Tests show case names and live Loguru messages by default (pytest `-v -s`). Logs
 cover case start/end, input creation, FP32 reference calculation, API calls, output

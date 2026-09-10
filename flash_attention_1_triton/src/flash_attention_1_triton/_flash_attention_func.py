@@ -2,6 +2,8 @@
 """Fixed-length FlashAttention 1 interface."""
 
 import math
+from collections.abc import Callable
+from typing import cast
 
 import torch
 from beartype import beartype
@@ -49,7 +51,7 @@ def flash_attention_func(
 
     Raises:
         ValueError: If device, dtype, dimensions, strides, or scale are unsupported.
-        NotImplementedError: If gradients are requested or the forward kernel is unfinished.
+        NotImplementedError: If gradients are requested.
 
     Note:
         ``q``, ``k``, and ``v`` must be CUDA tensors on the same device with the same
@@ -79,8 +81,6 @@ def flash_attention_func(
         raise ValueError("softmax_scale must be positive and finite")
     if torch.is_grad_enabled() and any(x.requires_grad for x in (q, k, v)):
         raise NotImplementedError("FlashAttention backward is not implemented; use torch.no_grad()")
-    if not _flash_attention_kernel.FORWARD_IMPLEMENTED:
-        raise NotImplementedError("FlashAttention forward kernel is not implemented yet")
 
     # Keep the iteratively updated output and row statistics in FP32 in HBM.
     output = torch.zeros(q.shape, dtype=torch.float32, device=q.device)
@@ -90,7 +90,11 @@ def flash_attention_func(
     row_sum = torch.zeros((batch, query_length, heads), dtype=torch.float32, device=q.device)
     # ponytail: fixed tiles and batch/head parallelism; tune after the kernel is correct.
     with torch.cuda.device(q.device):
-        _flash_attention_kernel._flash_attention_forward[(batch, heads)](
+        # JIT launch accepts Python values; tl.tensor/constexpr describe the compiled kernel.
+        launch = cast(
+            Callable[..., None], _flash_attention_kernel._flash_attention_forward[(batch, heads)]
+        )
+        launch(
             q,
             k,
             v,
