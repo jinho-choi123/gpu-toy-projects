@@ -115,6 +115,38 @@ def make_inputs(
     return tuple(inputs)
 
 
+def assert_output(output: LowPrecision, expected: LowPrecision, q: LowPrecision) -> None:
+    """Check the output contract and numerical accuracy.
+
+    Args:
+        output (Tensor, float16 | bfloat16): API output to check.
+        expected (Tensor, float16 | bfloat16): Independent reference output.
+        q (Tensor, float16 | bfloat16): Query defining the output shape, dtype, and device.
+
+    Returns:
+        None: Complete if the output contract and numerical comparison pass.
+
+    Raises:
+        AssertionError: If the output contract or numerical comparison fails.
+    """
+    logger.info("Checking output shape, dtype, device, and contiguity")
+    assert output.shape == q.shape
+    assert output.dtype == q.dtype
+    assert output.device == q.device
+    assert output.is_contiguous()
+    atol, rtol = (1e-3, 1e-2) if q.dtype == torch.float16 else (1e-2, 5e-2)
+    logger.info(
+        "Output: shape={} dtype={} device={} max_abs_error={:.6g} atol={} rtol={}",
+        tuple(output.shape),
+        output.dtype,
+        output.device,
+        (output.detach().float() - expected.detach()).abs().max().item(),
+        atol,
+        rtol,
+    )
+    torch.testing.assert_close(output.float(), expected.float(), atol=atol, rtol=rtol)
+
+
 def assert_output_and_gradients(
     output: LowPrecision,
     expected: LowPrecision,
@@ -138,23 +170,9 @@ def assert_output_and_gradients(
     Raises:
         AssertionError: If the output contract or a numerical comparison fails.
     """
-    logger.info("Checking output shape, dtype, device, and contiguity")
     q = inputs[0]
-    assert output.shape == q.shape
-    assert output.dtype == q.dtype
-    assert output.device == q.device
-    assert output.is_contiguous()
+    assert_output(output, expected, q)
     atol, rtol = (1e-3, 1e-2) if q.dtype == torch.float16 else (1e-2, 5e-2)
-    logger.info(
-        "Output: shape={} dtype={} device={} max_abs_error={:.6g} atol={} rtol={}",
-        tuple(output.shape),
-        output.dtype,
-        output.device,
-        (output.detach().float() - expected.detach()).abs().max().item(),
-        atol,
-        rtol,
-    )
-    torch.testing.assert_close(output.float(), expected.float(), atol=atol, rtol=rtol)
 
     logger.info("Output comparison passed; creating upstream gradient")
     generator = torch.Generator(device=q.device).manual_seed(1)

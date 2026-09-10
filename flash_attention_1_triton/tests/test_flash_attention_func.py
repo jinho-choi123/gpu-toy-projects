@@ -3,15 +3,14 @@
 import pytest
 import torch
 from loguru import logger
-from reference import assert_output_and_gradients, attention, make_inputs
+from reference import assert_output, assert_output_and_gradients, attention, make_inputs
 
 from flash_attention_1_triton import flash_attention_func
 
 pytestmark = pytest.mark.usefixtures("cuda")
 
 
-@pytest.mark.parametrize("head_dim", [32, 64, 128])
-@pytest.mark.parametrize(
+attention_cases = pytest.mark.parametrize(
     "batch,heads,q_len,k_len,causal,scale,strided",
     [
         pytest.param(1, 1, 1, 1, False, None, False, id="single-token"),
@@ -24,6 +23,51 @@ pytestmark = pytest.mark.usefixtures("cuda")
         pytest.param(2, 2, 129, 65, False, None, True, id="longer-query-strided"),
     ],
 )
+
+
+@attention_cases
+@pytest.mark.parametrize("head_dim", [32, 64, 128])
+def test_forward(
+    dtype: torch.dtype,
+    head_dim: int,
+    batch: int,
+    heads: int,
+    q_len: int,
+    k_len: int,
+    causal: bool,
+    scale: float | None,
+    strided: bool,
+) -> None:
+    """Match forward output against PyTorch Flash Attention without autograd.
+
+    Args:
+        dtype (torch.dtype): Input dtype, torch.float16 or torch.bfloat16.
+        head_dim (int): Per-head dimension: 32, 64, or 128.
+        batch (int): Number of independent sequences.
+        heads (int): Shared Q/K/V head count.
+        q_len (int): Query sequence length.
+        k_len (int): Key and value sequence length.
+        causal (bool): Enable the bottom-right causal mask.
+        scale (float | None): Custom positive logit scale or the API default.
+        strided (bool): Test inputs with gaps between rows.
+
+    Returns:
+        None: Complete if the output matches the Flash Attention reference.
+    """
+    inputs = make_inputs(
+        [(batch, length, heads, head_dim) for length in (q_len, k_len, k_len)],
+        dtype,
+        strided=strided,
+    )
+    with torch.no_grad():
+        expected = attention(*inputs, causal=causal, softmax_scale=scale)
+        output = flash_attention_func(*inputs, causal=causal, softmax_scale=scale)
+    assert not output.requires_grad
+    assert_output(output, expected, inputs[0])
+
+
+@attention_cases
+@pytest.mark.parametrize("head_dim", [32, 64, 128])
 def test_output_and_gradients(
     dtype: torch.dtype,
     head_dim: int,
