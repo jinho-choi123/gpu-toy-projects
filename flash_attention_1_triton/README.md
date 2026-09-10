@@ -66,7 +66,7 @@ forward. Backward remains a separate implementation task.
 Run forward correctness, launcher validation, and annotation checks:
 
 ```bash
-uv run --locked pytest tests/test_flash_attention_func.py tests/test_forward_scaffold.py tests/test_annotations.py -k "not test_output_and_gradients" -q --capture=fd
+uv run --locked pytest tests/test_flash_attention_func.py tests/test_flash_attention_func_validation.py tests/test_annotations.py -k "not test_output_and_gradients" -q --capture=fd
 ```
 
 Forward-only and combined output/gradient tests reuse the same input cases.

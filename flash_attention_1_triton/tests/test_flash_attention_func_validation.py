@@ -1,4 +1,4 @@
-"""Validate forward launcher inputs and inference behavior."""
+"""Validate fixed-length API inputs and inference behavior."""
 
 import pytest
 import torch
@@ -77,8 +77,10 @@ def test_rejects_backward_but_allows_no_grad(input_index: int) -> None:
 
 @pytest.mark.parametrize("head_dim", [32, 64, 128])
 @pytest.mark.parametrize("causal", [False, True])
-def test_supported_strided_inputs(dtype: torch.dtype, head_dim: int, causal: bool) -> None:
-    """Accept strided cross-attention inputs without returning unwritten output.
+def test_forward_with_strided_sequence_rows(
+    dtype: torch.dtype, head_dim: int, causal: bool
+) -> None:
+    """Match fixed-length forward output when input sequence rows have gaps.
 
     Args:
         dtype (torch.dtype): Supported input dtype.
